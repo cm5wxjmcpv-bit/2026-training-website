@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CDL Training - Modules</title>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <style>
+    body { font-family: system-ui, Arial; padding: 24px; max-width: 720px; margin: 0 auto; }
+    .top { display:flex; justify-content:space-between; align-items:center; gap: 12px; }
+    button { padding: 10px 14px; font-size: 14px; }
+    ul { list-style: none; padding: 0; }
+    li { border: 1px solid #ddd; border-radius: 12px; padding: 14px; margin: 10px 0; display:flex; justify-content:space-between; align-items:center; }
+    a { text-decoration:none; }
+    .pill { padding: 4px 10px; border-radius: 999px; border: 1px solid #ccc; font-size: 12px; }
+    .done { border-color: #2a7; }
+    .locked { opacity: .5; pointer-events: none; }
+    .small { color:#555; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div>
+      <h2>Modules</h2>
+      <div class="small" id="who"></div>
+    </div>
+    <button onclick="logout()">Log out</button>
+  </div>
+
+  <div id="status" class="small">Loading status from Google Sheets…</div>
+
+  <ul id="list"></ul>
+
+  <h3>Test</h3>
+  <p class="small">The test unlocks after all modules are complete.</p>
+  <button id="testBtn" class="locked">Take Test</button>
+  <div id="testInfo" class="small"></div>
+
+  <script>
+    const username = requireAuth();
+    document.getElementById("who").textContent = `Signed in as ${username}`;
+
+    const list = document.getElementById("list");
+    const statusEl = document.getElementById("status");
+    const testBtn = document.getElementById("testBtn");
+    const testInfo = document.getElementById("testInfo");
+
+    function render(status) {
+      list.innerHTML = "";
+      MODULES.forEach(m => {
+        const done = !!status.modules["m" + m.id];
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <div>
+            <div><b>${m.title}</b></div>
+            <div class="small">Video module</div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <span class="pill ${done ? "done" : ""}">${done ? "Complete" : "Not complete"}</span>
+            <a href="player.html?m=${m.id}"><button>Open</button></a>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+
+      const unlocked = allModulesComplete(status);
+      testBtn.className = unlocked ? "" : "locked";
+      testBtn.onclick = () => location.href = "test.html";
+      testInfo.textContent = status.testComplete
+        ? `Test complete. Score: ${status.testScore}`
+        : (unlocked ? "Unlocked." : "Locked.");
+
+      statusEl.textContent = "Status loaded from Google Sheets.";
+    }
+
+    (async () => {
+      const status = await apiGetStatus(username);
+      if (!status.ok) {
+        statusEl.textContent = "Error loading status: " + (status.error || "Unknown");
+        return;
+      }
+      render(status);
+    })();
+  </script>
+</body>
+</html>

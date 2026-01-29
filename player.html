@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CDL Training - Player</title>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <style>
+    body { font-family: system-ui, Arial; padding: 24px; max-width: 900px; margin: 0 auto; }
+    .row { display:flex; justify-content:space-between; align-items:center; gap: 12px; }
+    button { padding: 10px 14px; font-size: 14px; }
+    .small { color:#555; font-size: 13px; }
+    /* Crop container to hide bottom area where controls/slider would be */
+    .crop {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+    }
+    /* push video slightly down so bottom is clipped */
+    #player {
+      position: absolute;
+      left: 0;
+      top: -30px; /* tweak this if you want more/less cropped */
+      width: 100%;
+      height: calc(100% + 60px);
+    }
+    .notice { padding: 10px; background:#f7f7f7; border: 1px solid #e5e5e5; border-radius: 12px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="row">
+    <div>
+      <h2 id="title">Module</h2>
+      <div class="small" id="who"></div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <a href="modules.html"><button>Back to Modules</button></a>
+      <button onclick="logout()">Log out</button>
+    </div>
+  </div>
+
+  <div class="crop"><div id="player"></div></div>
+
+  <div class="notice">
+    <div id="progress" class="small">Loading…</div>
+    <div id="done" style="margin-top:8px;"></div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    const username = requireAuth();
+    document.getElementById("who").textContent = `Signed in as ${username}`;
+
+    const moduleId = Number(qs("m"));
+    const mod = MODULES.find(x => x.id === moduleId) || MODULES[0];
+    document.getElementById("title").textContent = mod.title;
+
+    let player;
+    let duration = 0;
+    let maxWatched = 0; // furthest point they've legitimately reached
+    let tick;
+
+    function pct() {
+      if (!duration) return 0;
+      return maxWatched / duration;
+    }
+
+    function updateUI() {
+      const p = Math.floor(pct() * 100);
+      document.getElementById("progress").textContent =
+        `Progress: ${p}% (must reach ${Math.floor(REQUIRED_WATCH_PERCENT*100)}%)`;
+    }
+
+    function completeModule() {
+      document.getElementById("done").innerHTML = "<b>Module complete.</b> Logging to Google Sheets…";
+      apiLogModule(username, moduleId).then(res => {
+        if (!res.ok) {
+          document.getElementById("done").innerHTML = "<b>Error logging completion:</b> " + (res.error || "Unknown");
+          return;
+        }
+        document.getElementById("done").innerHTML = "<b>Logged!</b> You can go back to Modules.";
+      });
+    }
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player("player", {
+        videoId: mod.youtubeId,
+        playerVars: {
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1
+        },
+        events: {
+          onReady: () => {
+            duration = player.getDuration() || 0;
+            updateUI();
+
+            // Force normal speed
+            try { player.setPlaybackRate(1); } catch {}
+
+            // start anti-seek watch
+            tick = setInterval(() => {
+              if (!player || !duration) return;
+
+              const state = player.getPlayerState();
+              const t = player.getCurrentTime();
+
+              // only advance maxWatched when actually playing
+              if (state === YT.PlayerState.PLAYING) {
+                // if they jump ahead, yank them back
+                if (t > maxWatched + 1.5) {
+                  player.seekTo(maxWatched, true);
+                  return;
+                }
+                if (t > maxWatched) maxWatched = t;
+                updateUI();
+
+                // completion threshold
+                if (pct() >= REQUIRED_WATCH_PERCENT) {
+                  clearInterval(tick);
+                  completeModule();
+                }
+              }
+            }, 500);
+          },
+          onStateChange: (e) => {
+            // If video ends, count complete too (in case duration math is weird)
+            if (e.data === YT.PlayerState.ENDED) {
+              maxWatched = duration;
+              updateUI();
+              clearInterval(tick);
+              completeModule();
+            }
+          },
+          onPlaybackRateChange: () => {
+            // snap back to 1x if they try to speed-run
+            try { player.setPlaybackRate(1); } catch {}
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

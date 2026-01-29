@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CDL Training - Test</title>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <style>
+    body { font-family: system-ui, Arial; padding: 24px; max-width: 720px; margin: 0 auto; }
+    button, input { padding: 12px; font-size: 16px; }
+    .small { color:#555; font-size: 13px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; }
+  </style>
+</head>
+<body>
+  <h2>Test</h2>
+  <div class="small" id="who"></div>
+  <p class="small"><a href="modules.html">← Back to Modules</a></p>
+
+  <div id="lock" class="card">Checking if test is unlocked…</div>
+
+  <div id="test" class="card" style="display:none;">
+    <p><b>Question 1:</b> What is 1 + 1 ?</p>
+    <input id="a1" type="number" />
+    <div style="margin-top:12px;">
+      <button id="submit">Submit</button>
+    </div>
+    <div id="result" style="margin-top:12px;"></div>
+  </div>
+
+  <script>
+    const username = requireAuth();
+    document.getElementById("who").textContent = `Signed in as ${username}`;
+
+    const lock = document.getElementById("lock");
+    const test = document.getElementById("test");
+    const result = document.getElementById("result");
+
+    (async () => {
+      const status = await apiGetStatus(username);
+      if (!status.ok) {
+        lock.textContent = "Error: " + (status.error || "Unknown");
+        return;
+      }
+      if (!allModulesComplete(status)) {
+        lock.innerHTML = "<b>Locked.</b> Finish all modules first.";
+        return;
+      }
+      lock.style.display = "none";
+      test.style.display = "block";
+    })();
+
+    document.getElementById("submit").onclick = async () => {
+      const val = Number(document.getElementById("a1").value);
+      const score = (val === 2) ? 100 : 0;
+
+      result.innerHTML = "Logging score to Google Sheets…";
+      const res = await apiLogTest(username, true, score);
+
+      if (!res.ok) {
+        result.innerHTML = "<b>Error logging:</b> " + (res.error || "Unknown");
+        return;
+      }
+      result.innerHTML = `<b>Submitted.</b> Your score: ${score}`;
+    };
+  </script>
+</body>
+</html>

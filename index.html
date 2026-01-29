@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CDL Training - Login</title>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+  <style>
+    body { font-family: system-ui, Arial; padding: 24px; max-width: 420px; margin: 0 auto; }
+    input, button { width: 100%; padding: 12px; margin: 8px 0; font-size: 16px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; }
+    .err { color: #b00; }
+  </style>
+</head>
+<body>
+  <h2>CDL Training</h2>
+  <div class="card">
+    <label>Username</label>
+    <input id="u" autocomplete="username" />
+    <label>Password</label>
+    <input id="p" type="password" autocomplete="current-password" />
+    <button id="btn">Sign In</button>
+    <div id="msg" class="err"></div>
+  </div>
+
+  <script>
+    document.getElementById("btn").onclick = () => {
+      const u = document.getElementById("u").value.trim();
+      const p = document.getElementById("p").value;
+      const ok = login(u, p);
+      if (!ok) {
+        document.getElementById("msg").textContent = "Invalid username or password.";
+        return;
+      }
+      location.href = "modules.html";
+    };
+  </script>
+</body>
+</html>
