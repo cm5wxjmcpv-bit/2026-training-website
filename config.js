@@ -1,69 +1,77 @@
-// ====== EDIT THESE ======
-// These globals are consumed directly by page scripts and app.js.
-const APP_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbwecN0FKWSzjEHGWCwRuUIiHFWAlve5Ax9M1B9BJ_rsdp2C-qOYfD32UKR6oDNqvmRE-Q/exec";
+// ===== CONFIG =====
 
-// Backward-compatible alias used by the newer Sheets helper functions below.
-const SHEETS_API_URL = APP_SCRIPT_URL;
+// Google Apps Script API
+const SHEETS_API_URL =
+  "https://script.google.com/macros/s/AKfycbxJkZGJSTUCTH-Z_1JJP1u8SOZiLyJBMurK8HML2ICuYsCJKWQJCNQ2pjy68wQ2GOU32w/exec";
 
-// simple demo users (NOT SECURE — client-side only)
-const USERS = [
-  { username: "student1", password: "1234" },
-  { username: "student2", password: "1234" }
+
+// ===== DEMO USERS (for login) =====
+const USERS = {
+  student1: {
+    password: "1234",
+    role: "student"
+  },
+  student2: {
+    password: "1234",
+    role: "student"
+  },
+  instructor1: {
+    password: "1234",
+    role: "instructor"
+  }
+};
+
+
+// ===== MODULE LIST =====
+const MODULES = [
+  {
+    id: 1,
+    title: "Module 1",
+    videoId: ""
+  },
+  {
+    id: 2,
+    title: "Module 2",
+    videoId: ""
+  },
+  {
+    id: 3,
+    title: "Module 3",
+    videoId: ""
+  },
+  {
+    id: 4,
+    title: "Module 4",
+    videoId: ""
+  },
+  {
+    id: 5,
+    title: "Module 5",
+    videoId: ""
+  },
+  {
+    id: 6,
+    title: "Module 6",
+    videoId: ""
+  },
+  {
+    id: 7,
+    title: "Module 7",
+    videoId: ""
+  },
+  {
+    id: 8,
+    title: "Module 8",
+    videoId: ""
+  },
+  {
+    id: 9,
+    title: "Module 9",
+    videoId: ""
+  },
+  {
+    id: 10,
+    title: "Module 10",
+    videoId: ""
+  }
 ];
-
-// Your YouTube link: https://youtu.be/6DSvlh-zHu4
-const MODULES = Array.from({ length: 10 }, (_, i) => ({
-  id: i + 1,
-  title: `Module ${i + 1}`,
-  youtubeId: "6DSvlh-zHu4"
-}));
-
-// percent watched required to count complete (0.95 = 95%)
-const REQUIRED_WATCH_PERCENT = 0.95;
-
-// ---- READ STATUS ----
-async function sheetsGetStatus(username) {
-  const url =
-    SHEETS_API_URL +
-    "?action=getStatus&username=" +
-    encodeURIComponent(username);
-
-  const res = await fetch(url, {
-    method: "GET",
-    cache: "no-store"
-  });
-
-  return await res.json();
-}
-
-// ---- LOG MODULE COMPLETION ----
-async function sheetsLogModule(username, moduleId) {
-  const res = await fetch(SHEETS_API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "logModule",
-      username: username,
-      moduleId: moduleId
-    })
-  });
-
-  return await res.json();
-}
-
-// ---- LOG TEST RESULT ----
-async function sheetsLogTest(username, score) {
-  const res = await fetch(SHEETS_API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "logTest",
-      username: username,
-      complete: true,
-      score: score
-    })
-  });
-
-  return await res.json();
-}
