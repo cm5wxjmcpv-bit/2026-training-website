@@ -29,7 +29,6 @@ async function apiGetStatus(username) {
 async function apiLogModule(username, moduleId) {
   const r = await fetch(APP_SCRIPT_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "logModule", username, moduleId })
   });
   return await r.json();
@@ -38,7 +37,6 @@ async function apiLogModule(username, moduleId) {
 async function apiLogTest(username, complete, score) {
   const r = await fetch(APP_SCRIPT_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "logTest", username, complete, score })
   });
   return await r.json();
