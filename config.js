@@ -33,16 +33,56 @@ const USERS = [
 // ==============================
 
 const MODULES = [
-  { id: 1, title: "Module 1", youtubeId: "VIDEO_ID_HERE" },
-  { id: 2, title: "Module 2", youtubeId: "VIDEO_ID_HERE" },
-  { id: 3, title: "Module 3", youtubeId: "VIDEO_ID_HERE" },
-  { id: 4, title: "Module 4", youtubeId: "VIDEO_ID_HERE" },
-  { id: 5, title: "Module 5", youtubeId: "VIDEO_ID_HERE" },
-  { id: 6, title: "Module 6", youtubeId: "VIDEO_ID_HERE" },
-  { id: 7, title: "Module 7", youtubeId: "VIDEO_ID_HERE" },
-  { id: 8, title: "Module 8", youtubeId: "VIDEO_ID_HERE" },
-  { id: 9, title: "Module 9", youtubeId: "VIDEO_ID_HERE" },
-  { id: 10, title: "Module 10", youtubeId: "VIDEO_ID_HERE" }
+  {
+    id: 1,
+    title: "Module 1",
+    youtubeId: "bDv3-0drOSQ"
+  },
+  {
+    id: 2,
+    title: "Module 2",
+    youtubeId: "6DSvlh-zHu4"
+  },
+  {
+    id: 3,
+    title: "Module 3",
+    youtubeId: "aqz-KE-bpKQ"
+  },
+  {
+    id: 4,
+    title: "Module 4",
+    youtubeId: "aqz-KE-bpKQ"
+  },
+  {
+    id: 5,
+    title: "Module 5",
+    youtubeId: "aqz-KE-bpKQ"
+  },
+  {
+    id: 6,
+    title: "Module 6",
+    youtubeId: "aqz-KE-bpKQ"
+  },
+  {
+    id: 7,
+    title: "Module 7",
+    youtubeId: "aqz-KE-bpKQ"
+  },
+  {
+    id: 8,
+    title: "Module 8",
+    youtubeId: "aqz-KE-bpKQ"
+  },
+  {
+    id: 9,
+    title: "Module 9",
+    youtubeId: "aqz-KE-bpKQ"
+  },
+  {
+    id: 10,
+    title: "Module 10",
+    youtubeId: "aqz-KE-bpKQ"
+  }
 ];
 
 
