@@ -31,30 +31,38 @@
 </div>
 
 <script>
-  document.getElementById("btn").onclick = () => {
-    const msg = document.getElementById("msg");
-    msg.textContent = "";
+document.getElementById("btn").onclick = async () => {
+  const msg = document.getElementById("msg");
+  msg.textContent = "";
 
-    const u = document.getElementById("u").value.trim();
-    const p = document.getElementById("p").value;
+  const u = document.getElementById("u").value.trim();
+  const p = document.getElementById("p").value;
 
-    if (!u || !p) {
-      msg.textContent = "Enter username and password.";
-      return;
-    }
+  if (!u || !p) {
+    msg.textContent = "Enter username and password.";
+    return;
+  }
 
-    if (typeof login !== "function") {
-      msg.textContent = "Login system not loaded.";
-      return;
-    }
+  if (typeof login !== "function") {
+    msg.textContent = "Login system not loaded.";
+    return;
+  }
 
-    if (!login(u, p)) {
+  try {
+    const ok = await login(u, p);
+
+    if (!ok) {
       msg.textContent = "Invalid username or password.";
       return;
     }
 
     location.href = "modules.html";
-  };
+
+  } catch (err) {
+    msg.textContent = "Login error.";
+    console.error(err);
+  }
+};
 </script>
 
 </body>
