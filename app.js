@@ -8,10 +8,19 @@ function requireAuth() {
   return u;
 }
 
-function login(username, password) {
-  const match = USERS.find(x => x.username === username && x.password === password);
-  if (!match) return false;
-  sessionStorage.setItem("username", username);
+async function login(username, password) {
+  const url = `${APP_SCRIPT_URL}?action=validateLogin&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+  const r = await fetch(url, { method: "GET", cache: "no-store" });
+
+  if (!r.ok) {
+    throw new Error(`Login failed: ${r.status}`);
+  }
+
+  const data = await r.json();
+
+  if (!data.ok) return false;
+
+  sessionStorage.setItem("username", data.username);
   return true;
 }
 
