@@ -104,6 +104,7 @@ button:hover{
 <tr>
 <th>Username</th>
 <th>Password</th>
+<th>Test Score</th>
 <th>Actions</th>
 </tr>
 </thead>
@@ -186,6 +187,7 @@ const row = document.createElement("tr")
 row.innerHTML=`
 <td>${s.username}</td>
 <td>${s.password}</td>
+<td>${s.testScore ?? ""}</td>
 <td class="actions">
 <button onclick="editStudent('${s.username}','${s.password}')">Edit</button>
 <button onclick="deleteStudent('${s.username}')">Delete</button>
