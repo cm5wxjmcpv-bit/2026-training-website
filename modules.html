@@ -236,6 +236,30 @@
       transition:width .2s ease;
     }
 
+    .progress-loading{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin-bottom:12px;
+      color:var(--muted);
+      font-weight:700;
+      min-height:38px;
+    }
+
+    .spinner{
+      width:18px;
+      height:18px;
+      border-radius:999px;
+      border:2px solid rgba(23,50,77,.16);
+      border-top-color:var(--navy);
+      animation:spin .8s linear infinite;
+      flex:0 0 auto;
+    }
+
+    .loading-hidden{
+      display:none !important;
+    }
+
     .section-title{
       margin:0 0 14px;
       color:var(--navy-dark);
@@ -379,6 +403,10 @@
       font-size:.92rem;
     }
 
+    @keyframes spin{
+      to{ transform:rotate(360deg); }
+    }
+
     @media (max-width: 920px){
       .summary-grid{
         grid-template-columns:1fr 1fr;
@@ -444,11 +472,19 @@
     <section class="summary-grid">
       <div class="summary-card">
         <div class="summary-title">Overall Progress</div>
-        <div class="progress-value" id="progressValue">0%</div>
-        <div class="progress-bar">
-          <div class="progress-fill" id="progressFill"></div>
+
+        <div id="progressLoading" class="progress-loading">
+          <span class="spinner"></span>
+          <span>Loading progress from Google Sheets…</span>
         </div>
-        <div class="small" id="progressNote">0 of 10 modules completed</div>
+
+        <div id="progressContent">
+          <div class="progress-value" id="progressValue">0%</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <div class="small" id="progressNote">0 of 10 modules completed</div>
+        </div>
       </div>
 
       <div class="summary-card">
@@ -514,6 +550,8 @@
     const testInfo = document.getElementById("testInfo");
     const testLockedBtn = document.getElementById("testLockedBtn");
     const testOpenBtn = document.getElementById("testOpenBtn");
+    const progressLoading = document.getElementById("progressLoading");
+    const progressContent = document.getElementById("progressContent");
 
     const CACHE_KEY = "cdl_status_" + username;
 
@@ -574,6 +612,11 @@
 
     function allModulesDone(status) {
       return MODULES.every(m => !!status.modules["m" + m.id]);
+    }
+
+    function showProgressLoading(show) {
+      progressLoading.classList.toggle("loading-hidden", !show);
+      progressContent.classList.toggle("loading-hidden", show);
     }
 
     function render(status, sourceText) {
@@ -640,6 +683,8 @@
       if (sourceText) {
         statusEl.textContent = sourceText;
       }
+
+      showProgressLoading(false);
     }
 
     function renderLoadingShell() {
@@ -678,6 +723,8 @@
       testLockedBtn.style.display = "inline-flex";
       testOpenBtn.style.display = "none";
       testInfo.textContent = "Checking status…";
+
+      showProgressLoading(true);
     }
 
     async function loadFreshStatus() {
@@ -686,6 +733,7 @@
 
         if (!status || !status.ok) {
           statusEl.textContent = "Error loading status: " + ((status && status.error) || "Unknown");
+          showProgressLoading(false);
           return;
         }
 
@@ -700,6 +748,7 @@
           render(cached, "Showing saved status. Live refresh failed.");
         } else {
           statusEl.textContent = "Error loading status.";
+          showProgressLoading(false);
         }
       }
     }
@@ -712,7 +761,8 @@
       if (cached) {
         render(cached, "Showing saved status. Refreshing from Google Sheets…");
       } else {
-        render(makeEmptyStatus(), "Loading live status from Google Sheets…");
+        statusEl.textContent = "Loading live status from Google Sheets…";
+        showProgressLoading(true);
       }
 
       loadFreshStatus();
