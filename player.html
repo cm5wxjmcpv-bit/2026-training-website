@@ -228,10 +228,9 @@
 
     #player{
       position:absolute;
-      left:0;
-      top:-30px;
+      inset:0;
       width:100%;
-      height:calc(100% + 60px);
+      height:100%;
     }
 
     .player-footer{
@@ -432,27 +431,81 @@
     const mod = MODULES.find(x => x.id === moduleId) || MODULES[0];
     document.getElementById("title").textContent = mod.title;
     document.getElementById("modulePill").textContent = `Module ${mod.id}`;
-    document.getElementById("ruleText").textContent =
-      `${Math.floor(REQUIRED_WATCH_PERCENT * 100)}% minimum viewing threshold`;
 
     let player;
     let duration = 0;
     let maxWatched = 0;
+    let validPlaySeconds = 0;
     let tick;
     let logged = false;
+    let lastWallTime = 0;
+    let lastPlayerTime = 0;
+
+    const SEEK_TOLERANCE_SECONDS = 1.25;
+    const MAX_INTERVAL_SECONDS = 1.5;
+    const ACTIVE_TIME_BUFFER_SECONDS = 10;
+
+    function clamp(n, min, max) {
+      return Math.min(Math.max(n, min), max);
+    }
+
+    function formatSeconds(sec) {
+      sec = Math.max(0, Math.floor(sec || 0));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+
+      if (h > 0) {
+        return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      }
+      return `${m}:${String(s).padStart(2, "0")}`;
+    }
 
     function pct() {
       if (!duration) return 0;
       return maxWatched / duration;
     }
 
+    function requiredWatchPercent() {
+      return REQUIRED_WATCH_PERCENT || 0.9;
+    }
+
+    function requiredActiveSeconds() {
+      if (!duration) return 0;
+      const byPercent = duration * requiredWatchPercent();
+      const minusTen = Math.max(0, duration - ACTIVE_TIME_BUFFER_SECONDS);
+      return Math.min(byPercent, minusTen);
+    }
+
+    function completionReady() {
+      return pct() >= requiredWatchPercent() && validPlaySeconds >= requiredActiveSeconds();
+    }
+
     function updateUI() {
-      const p = Math.floor(pct() * 100);
+      const watchedPercent = Math.floor(pct() * 100);
+      const requiredPercent = Math.floor(requiredWatchPercent() * 100);
+      const activeRequired = requiredActiveSeconds();
+
+      document.getElementById("ruleText").textContent =
+        `${requiredPercent}% minimum viewing threshold + active viewing time`;
+
       document.getElementById("progress").textContent =
-        `Progress: ${p}% (must reach ${Math.floor(REQUIRED_WATCH_PERCENT * 100)}%)`;
-      document.getElementById("progressFill").style.width = `${p}%`;
+        `Progress: ${watchedPercent}% · Active time: ${formatSeconds(validPlaySeconds)} / ${formatSeconds(activeRequired)}`;
+
+      document.getElementById("progressFill").style.width = `${watchedPercent}%`;
+
+      if (logged) {
+        document.getElementById("statusText").textContent = "Complete";
+        return;
+      }
+
       document.getElementById("statusText").textContent =
-        p >= Math.floor(REQUIRED_WATCH_PERCENT * 100) ? "Eligible for Completion" : "In Progress";
+        completionReady() ? "Eligible for Completion" : "In Progress";
+
+      if (!completionReady()) {
+        document.getElementById("done").innerHTML =
+          `Watch at least ${requiredPercent}% and keep the video actively playing for ${formatSeconds(activeRequired)}.`;
+      }
     }
 
     function completeModule() {
@@ -464,6 +517,7 @@
 
       apiLogModule(username, mod.id).then(res => {
         if (!res.ok) {
+          logged = false;
           document.getElementById("statusText").textContent = "Logging Error";
           document.getElementById("done").innerHTML = "<b>Error logging completion:</b> " + (res.error || "Unknown");
           return;
@@ -471,19 +525,47 @@
         document.getElementById("statusText").textContent = "Complete";
         document.getElementById("done").innerHTML = "<b>Logged.</b> You can go back to Modules.";
       }).catch(err => {
+        logged = false;
         console.error(err);
         document.getElementById("statusText").textContent = "Logging Error";
         document.getElementById("done").innerHTML = "<b>Error logging completion.</b>";
       });
     }
 
+    function safeSeekBack(target) {
+      try {
+        player.seekTo(Math.max(0, target), true);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function enforcePlaybackRate() {
+      try {
+        if (player && typeof player.getPlaybackRate === "function" && player.getPlaybackRate() !== 1) {
+          player.setPlaybackRate(1);
+        }
+      } catch {}
+    }
+
+    function isVisibleForCredit() {
+      return document.visibilityState === "visible";
+    }
+
+    function maybeComplete() {
+      if (!logged && completionReady()) {
+        clearInterval(tick);
+        completeModule();
+      }
+    }
+
     function onYouTubeIframeAPIReady() {
       player = new YT.Player("player", {
         videoId: mod.youtubeId,
         playerVars: {
-          controls: 0,
+          controls: 1,
           disablekb: 1,
-          fs: 0,
+          fs: 1,
           rel: 0,
           modestbranding: 1,
           playsinline: 1
@@ -491,46 +573,97 @@
         events: {
           onReady: () => {
             duration = player.getDuration() || 0;
-            updateUI();
+            lastWallTime = Date.now();
+            lastPlayerTime = 0;
 
-            try { player.setPlaybackRate(1); } catch {}
+            updateUI();
+            enforcePlaybackRate();
 
             tick = setInterval(() => {
-              if (!player || !duration) return;
+              if (!player || !duration || logged) return;
 
-              const state = player.getPlayerState();
-              const t = player.getCurrentTime();
+              const now = Date.now();
+              let elapsed = (now - lastWallTime) / 1000;
+              lastWallTime = now;
+              elapsed = clamp(elapsed, 0, MAX_INTERVAL_SECONDS);
+
+              let state;
+              let currentTime;
+
+              try {
+                state = player.getPlayerState();
+                currentTime = player.getCurrentTime() || 0;
+              } catch {
+                return;
+              }
+
+              currentTime = clamp(currentTime, 0, duration);
+              enforcePlaybackRate();
 
               if (state === YT.PlayerState.PLAYING) {
-                if (t > maxWatched + 1.5) {
-                  player.seekTo(maxWatched, true);
+                if (currentTime > maxWatched + SEEK_TOLERANCE_SECONDS) {
+                  safeSeekBack(maxWatched);
+                  updateUI();
                   return;
                 }
 
-                if (t > maxWatched) maxWatched = t;
-                updateUI();
+                if (currentTime > maxWatched) {
+                  maxWatched = currentTime;
+                }
 
-                if (pct() >= REQUIRED_WATCH_PERCENT) {
-                  clearInterval(tick);
-                  completeModule();
+                const forwardDelta = currentTime - lastPlayerTime;
+                const looksNatural = forwardDelta >= -0.35 && forwardDelta <= 2.5;
+
+                if (isVisibleForCredit() && looksNatural) {
+                  validPlaySeconds = Math.min(duration, validPlaySeconds + elapsed);
                 }
               }
+
+              lastPlayerTime = currentTime;
+              updateUI();
+              maybeComplete();
             }, 500);
           },
+
           onStateChange: (e) => {
-            if (e.data === YT.PlayerState.ENDED) {
-              maxWatched = duration;
+            if (!player || !duration || logged) return;
+
+            let currentTime = 0;
+            try {
+              currentTime = player.getCurrentTime() || 0;
+            } catch {}
+
+            currentTime = clamp(currentTime, 0, duration);
+
+            if (currentTime > maxWatched + SEEK_TOLERANCE_SECONDS) {
+              safeSeekBack(maxWatched);
               updateUI();
-              clearInterval(tick);
-              completeModule();
+              return;
+            }
+
+            if (e.data === YT.PlayerState.ENDED) {
+              if (currentTime >= duration - 1.5) {
+                maxWatched = Math.max(maxWatched, duration);
+              }
+              updateUI();
+              maybeComplete();
             }
           },
+
           onPlaybackRateChange: () => {
-            try { player.setPlaybackRate(1); } catch {}
+            enforcePlaybackRate();
           }
         }
       });
     }
+
+    document.addEventListener("visibilitychange", () => {
+      updateUI();
+    });
+
+    window.addEventListener("beforeunload", () => {
+      if (tick) clearInterval(tick);
+    });
   </script>
 </body>
 </html>
