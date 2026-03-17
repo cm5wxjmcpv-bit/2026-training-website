@@ -436,14 +436,20 @@
     let duration = 0;
     let maxWatched = 0;
     let validPlaySeconds = 0;
-    let tick;
     let logged = false;
+
+    let progressTick = null;
+    let guardTick = null;
+
     let lastWallTime = 0;
     let lastPlayerTime = 0;
+    let suppressGuardUntil = 0;
+    let correctingSeek = false;
 
-    const SEEK_TOLERANCE_SECONDS = 1.25;
-    const MAX_INTERVAL_SECONDS = 1.5;
+    const SEEK_TOLERANCE_SECONDS = 0.75;
+    const MAX_INTERVAL_SECONDS = 1.25;
     const ACTIVE_TIME_BUFFER_SECONDS = 10;
+    const GUARD_INTERVAL_MS = 150;
 
     function clamp(n, min, max) {
       return Math.min(Math.max(n, min), max);
@@ -481,6 +487,10 @@
       return pct() >= requiredWatchPercent() && validPlaySeconds >= requiredActiveSeconds();
     }
 
+    function isVisibleForCredit() {
+      return document.visibilityState === "visible" && document.hasFocus();
+    }
+
     function updateUI() {
       const watchedPercent = Math.floor(pct() * 100);
       const requiredPercent = Math.floor(requiredWatchPercent() * 100);
@@ -512,51 +522,170 @@
       if (logged) return;
       logged = true;
 
+      stopTimers();
+
       document.getElementById("statusText").textContent = "Logging Completion";
       document.getElementById("done").innerHTML = "<b>Module complete.</b> Logging to Google Sheets…";
 
       apiLogModule(username, mod.id).then(res => {
         if (!res.ok) {
           logged = false;
+          startTimers();
           document.getElementById("statusText").textContent = "Logging Error";
-          document.getElementById("done").innerHTML = "<b>Error logging completion:</b> " + (res.error || "Unknown");
+          document.getElementById("done").innerHTML =
+            "<b>Error logging completion:</b> " + (res.error || "Unknown");
           return;
         }
+
         document.getElementById("statusText").textContent = "Complete";
         document.getElementById("done").innerHTML = "<b>Logged.</b> You can go back to Modules.";
       }).catch(err => {
         logged = false;
+        startTimers();
         console.error(err);
         document.getElementById("statusText").textContent = "Logging Error";
         document.getElementById("done").innerHTML = "<b>Error logging completion.</b>";
       });
     }
 
-    function safeSeekBack(target) {
-      try {
-        player.seekTo(Math.max(0, target), true);
-      } catch (err) {
-        console.error(err);
+    function maybeComplete() {
+      if (!logged && completionReady()) {
+        completeModule();
       }
     }
 
     function enforcePlaybackRate() {
       try {
-        if (player && typeof player.getPlaybackRate === "function" && player.getPlaybackRate() !== 1) {
-          player.setPlaybackRate(1);
+        if (player && typeof player.getPlaybackRate === "function") {
+          if (player.getPlaybackRate() !== 1) {
+            player.setPlaybackRate(1);
+          }
         }
       } catch {}
     }
 
-    function isVisibleForCredit() {
-      return document.visibilityState === "visible";
+    function performSeekCorrection(targetTime) {
+      if (!player || correctingSeek) return;
+
+      correctingSeek = true;
+      suppressGuardUntil = Date.now() + 1200;
+
+      try { player.pauseVideo(); } catch {}
+
+      setTimeout(() => {
+        try {
+          player.seekTo(Math.max(0, targetTime), true);
+        } catch {}
+
+        setTimeout(() => {
+          try {
+            if (!logged) player.playVideo();
+          } catch {}
+          correctingSeek = false;
+        }, 180);
+      }, 60);
     }
 
-    function maybeComplete() {
-      if (!logged && completionReady()) {
-        clearInterval(tick);
-        completeModule();
+    function detectAndCorrectSkip() {
+      if (!player || !duration || logged) return;
+      if (correctingSeek) return;
+      if (Date.now() < suppressGuardUntil) return;
+
+      let currentTime = 0;
+      let state = -1;
+
+      try {
+        currentTime = clamp(player.getCurrentTime() || 0, 0, duration);
+        state = player.getPlayerState();
+      } catch {
+        return;
       }
+
+      if (
+        (state === YT.PlayerState.PLAYING ||
+         state === YT.PlayerState.PAUSED ||
+         state === YT.PlayerState.BUFFERING ||
+         state === YT.PlayerState.ENDED) &&
+        currentTime > maxWatched + SEEK_TOLERANCE_SECONDS
+      ) {
+        performSeekCorrection(maxWatched);
+        updateUI();
+      }
+    }
+
+    function progressLoop() {
+      if (!player || !duration || logged) return;
+
+      const now = Date.now();
+      let elapsed = (now - lastWallTime) / 1000;
+      lastWallTime = now;
+      elapsed = clamp(elapsed, 0, MAX_INTERVAL_SECONDS);
+
+      let state = -1;
+      let currentTime = 0;
+
+      try {
+        state = player.getPlayerState();
+        currentTime = clamp(player.getCurrentTime() || 0, 0, duration);
+      } catch {
+        return;
+      }
+
+      enforcePlaybackRate();
+
+      if (correctingSeek) {
+        lastPlayerTime = currentTime;
+        updateUI();
+        return;
+      }
+
+      if (currentTime > maxWatched + SEEK_TOLERANCE_SECONDS) {
+        performSeekCorrection(maxWatched);
+        updateUI();
+        return;
+      }
+
+      if (state === YT.PlayerState.PLAYING) {
+        if (currentTime > maxWatched) {
+          maxWatched = currentTime;
+        }
+
+        const forwardDelta = currentTime - lastPlayerTime;
+        const looksNatural = forwardDelta >= -0.25 && forwardDelta <= 1.5;
+
+        if (isVisibleForCredit() && looksNatural) {
+          validPlaySeconds = Math.min(duration, validPlaySeconds + elapsed);
+        }
+      }
+
+      if (state === YT.PlayerState.ENDED) {
+        if (currentTime >= duration - 1.5 && maxWatched < duration - 1.5) {
+          performSeekCorrection(maxWatched);
+          updateUI();
+          return;
+        }
+
+        maxWatched = Math.max(maxWatched, currentTime);
+      }
+
+      lastPlayerTime = currentTime;
+      updateUI();
+      maybeComplete();
+    }
+
+    function startTimers() {
+      stopTimers();
+      lastWallTime = Date.now();
+
+      progressTick = setInterval(progressLoop, 250);
+      guardTick = setInterval(detectAndCorrectSkip, GUARD_INTERVAL_MS);
+    }
+
+    function stopTimers() {
+      if (progressTick) clearInterval(progressTick);
+      if (guardTick) clearInterval(guardTick);
+      progressTick = null;
+      guardTick = null;
     }
 
     function onYouTubeIframeAPIReady() {
@@ -576,53 +705,9 @@
             lastWallTime = Date.now();
             lastPlayerTime = 0;
 
-            updateUI();
             enforcePlaybackRate();
-
-            tick = setInterval(() => {
-              if (!player || !duration || logged) return;
-
-              const now = Date.now();
-              let elapsed = (now - lastWallTime) / 1000;
-              lastWallTime = now;
-              elapsed = clamp(elapsed, 0, MAX_INTERVAL_SECONDS);
-
-              let state;
-              let currentTime;
-
-              try {
-                state = player.getPlayerState();
-                currentTime = player.getCurrentTime() || 0;
-              } catch {
-                return;
-              }
-
-              currentTime = clamp(currentTime, 0, duration);
-              enforcePlaybackRate();
-
-              if (state === YT.PlayerState.PLAYING) {
-                if (currentTime > maxWatched + SEEK_TOLERANCE_SECONDS) {
-                  safeSeekBack(maxWatched);
-                  updateUI();
-                  return;
-                }
-
-                if (currentTime > maxWatched) {
-                  maxWatched = currentTime;
-                }
-
-                const forwardDelta = currentTime - lastPlayerTime;
-                const looksNatural = forwardDelta >= -0.35 && forwardDelta <= 2.5;
-
-                if (isVisibleForCredit() && looksNatural) {
-                  validPlaySeconds = Math.min(duration, validPlaySeconds + elapsed);
-                }
-              }
-
-              lastPlayerTime = currentTime;
-              updateUI();
-              maybeComplete();
-            }, 500);
+            updateUI();
+            startTimers();
           },
 
           onStateChange: (e) => {
@@ -630,20 +715,27 @@
 
             let currentTime = 0;
             try {
-              currentTime = player.getCurrentTime() || 0;
+              currentTime = clamp(player.getCurrentTime() || 0, 0, duration);
             } catch {}
 
-            currentTime = clamp(currentTime, 0, duration);
-
-            if (currentTime > maxWatched + SEEK_TOLERANCE_SECONDS) {
-              safeSeekBack(maxWatched);
+            if (
+              !correctingSeek &&
+              currentTime > maxWatched + SEEK_TOLERANCE_SECONDS &&
+              (
+                e.data === YT.PlayerState.PLAYING ||
+                e.data === YT.PlayerState.PAUSED ||
+                e.data === YT.PlayerState.BUFFERING ||
+                e.data === YT.PlayerState.ENDED
+              )
+            ) {
+              performSeekCorrection(maxWatched);
               updateUI();
               return;
             }
 
             if (e.data === YT.PlayerState.ENDED) {
               if (currentTime >= duration - 1.5) {
-                maxWatched = Math.max(maxWatched, duration);
+                maxWatched = Math.max(maxWatched, currentTime);
               }
               updateUI();
               maybeComplete();
@@ -657,12 +749,12 @@
       });
     }
 
-    document.addEventListener("visibilitychange", () => {
-      updateUI();
-    });
+    document.addEventListener("visibilitychange", updateUI);
+    window.addEventListener("focus", updateUI);
+    window.addEventListener("blur", updateUI);
 
     window.addEventListener("beforeunload", () => {
-      if (tick) clearInterval(tick);
+      stopTimers();
     });
   </script>
 </body>
