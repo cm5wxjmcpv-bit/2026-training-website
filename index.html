@@ -114,10 +114,10 @@
 
     .hero-card{
       padding: 34px;
-      min-height: 470px;
       display:flex;
       flex-direction:column;
       justify-content:center;
+      min-height: 520px;
       isolation:isolate;
     }
 
@@ -258,10 +258,30 @@
       cursor:pointer;
       box-shadow:0 10px 20px rgba(16,38,58,.18);
       transition:transform .08s ease, opacity .15s ease;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
     }
 
     #btn:hover{ opacity:.97; }
     #btn:active{ transform:translateY(1px); }
+
+    #btn:disabled{
+      cursor:wait;
+      opacity:.9;
+    }
+
+    .btn-spinner{
+      width:18px;
+      height:18px;
+      border-radius:999px;
+      border:2px solid rgba(255,255,255,.35);
+      border-top-color:#fff;
+      display:none;
+      animation:spin .8s linear infinite;
+      flex:0 0 auto;
+    }
 
     .err{
       min-height:22px;
@@ -277,6 +297,56 @@
       padding: 0 20px 30px;
       color: var(--muted);
       font-size:.92rem;
+    }
+
+    .loading-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(16,38,58,.42);
+      backdrop-filter:blur(2px);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:9999;
+      padding:20px;
+    }
+
+    .loading-card{
+      width:min(92vw, 360px);
+      background:#fff;
+      border-radius:18px;
+      box-shadow:0 24px 60px rgba(16,38,58,.24);
+      padding:24px;
+      text-align:center;
+      border:1px solid rgba(23,50,77,.08);
+    }
+
+    .loading-spinner{
+      width:44px;
+      height:44px;
+      margin:0 auto 14px;
+      border-radius:999px;
+      border:4px solid rgba(23,50,77,.14);
+      border-top-color:var(--navy);
+      animation:spin .8s linear infinite;
+    }
+
+    .loading-title{
+      margin:0;
+      color:var(--navy-dark);
+      font-size:1.1rem;
+      font-weight:900;
+    }
+
+    .loading-sub{
+      margin:8px 0 0;
+      color:var(--muted);
+      line-height:1.5;
+      font-size:.95rem;
+    }
+
+    @keyframes spin{
+      to{ transform:rotate(360deg); }
     }
 
     @media (max-width: 900px){
@@ -364,7 +434,10 @@
           <input id="p" type="password" autocomplete="current-password">
         </div>
 
-        <button id="btn">Sign In</button>
+        <button id="btn">
+          <span class="btn-spinner" id="btnSpinner"></span>
+          <span id="btnText">Sign In</span>
+        </button>
         <div id="msg" class="err"></div>
       </section>
     </div>
@@ -374,7 +447,32 @@
     Martinsville CDL Program · ELDT Compliance Training
   </div>
 
+  <div class="loading-overlay" id="loadingOverlay" aria-hidden="true">
+    <div class="loading-card">
+      <div class="loading-spinner"></div>
+      <p class="loading-title">Signing you in…</p>
+      <p class="loading-sub">Loading your training dashboard.</p>
+    </div>
+  </div>
+
   <script>
+    function setLoginLoading(isLoading) {
+      const btn = document.getElementById("btn");
+      const btnText = document.getElementById("btnText");
+      const btnSpinner = document.getElementById("btnSpinner");
+      const overlay = document.getElementById("loadingOverlay");
+      const u = document.getElementById("u");
+      const p = document.getElementById("p");
+
+      btn.disabled = isLoading;
+      u.disabled = isLoading;
+      p.disabled = isLoading;
+      btnSpinner.style.display = isLoading ? "inline-block" : "none";
+      btnText.textContent = isLoading ? "Signing In…" : "Sign In";
+      overlay.style.display = isLoading ? "flex" : "none";
+      overlay.setAttribute("aria-hidden", isLoading ? "false" : "true");
+    }
+
     async function doLogin() {
       const msg = document.getElementById("msg");
       msg.textContent = "";
@@ -392,17 +490,20 @@
         return;
       }
 
+      setLoginLoading(true);
+
       try {
         const ok = await login(u, p);
 
         if (!ok) {
+          setLoginLoading(false);
           msg.textContent = "Invalid username or password.";
           return;
         }
 
         location.href = "modules.html";
-
       } catch (err) {
+        setLoginLoading(false);
         msg.textContent = "Login error.";
         console.error(err);
       }
