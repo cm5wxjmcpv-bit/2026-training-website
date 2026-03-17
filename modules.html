@@ -233,6 +233,7 @@
       width:0%;
       background:linear-gradient(90deg,var(--green),#54b36f);
       border-radius:999px;
+      transition:width .2s ease;
     }
 
     .section-title{
@@ -314,6 +315,12 @@
       background:var(--gray-soft);
       color:var(--gray);
       border-color:#d5d9df;
+    }
+
+    .badge-loading{
+      background:#eef2f6;
+      color:#64748b;
+      border-color:#d8e0e8;
     }
 
     .module-actions{
@@ -431,7 +438,7 @@
         Martinsville CDL Program.
       </p>
       <div class="who" id="who"></div>
-      <div id="status" class="small" style="margin-top:6px;">Loading status from Google Sheets…</div>
+      <div id="status" class="small" style="margin-top:6px;">Loading modules…</div>
     </section>
 
     <section class="summary-grid">
@@ -508,16 +515,78 @@
     const testLockedBtn = document.getElementById("testLockedBtn");
     const testOpenBtn = document.getElementById("testOpenBtn");
 
-    function render(status) {
+    const CACHE_KEY = "cdl_status_" + username;
+
+    function makeEmptyStatus() {
+      const modules = {};
+      MODULES.forEach(m => {
+        modules["m" + m.id] = false;
+      });
+
+      return {
+        ok: true,
+        username,
+        modules,
+        testComplete: false,
+        testScore: ""
+      };
+    }
+
+    function normalizeStatus(status) {
+      const base = makeEmptyStatus();
+
+      if (!status || typeof status !== "object") {
+        return base;
+      }
+
+      const normalized = {
+        ok: status.ok !== false,
+        username: status.username || username,
+        modules: { ...base.modules },
+        testComplete: !!status.testComplete,
+        testScore: status.testScore ?? ""
+      };
+
+      if (status.modules && typeof status.modules === "object") {
+        MODULES.forEach(m => {
+          normalized.modules["m" + m.id] = !!status.modules["m" + m.id];
+        });
+      }
+
+      return normalized;
+    }
+
+    function safeReadCache() {
+      try {
+        const raw = sessionStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        return normalizeStatus(JSON.parse(raw));
+      } catch {
+        return null;
+      }
+    }
+
+    function safeWriteCache(status) {
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(normalizeStatus(status)));
+      } catch {}
+    }
+
+    function allModulesDone(status) {
+      return MODULES.every(m => !!status.modules["m" + m.id]);
+    }
+
+    function render(status, sourceText) {
+      const safeStatus = normalizeStatus(status);
       list.innerHTML = "";
 
       let completed = 0;
 
       MODULES.forEach(m => {
-        const done = !!status.modules["m" + m.id];
+        const done = !!safeStatus.modules["m" + m.id];
         if (done) completed++;
 
-        const card = document.createElement("article");
+        const card = document.createElement("div");
         card.className = "module-card";
         card.innerHTML = `
           <div>
@@ -550,11 +619,11 @@
       progressFill.style.width = percent + "%";
       progressNote.textContent = `${completed} of ${total} modules completed`;
 
-      const unlocked = allModulesComplete(status);
+      const unlocked = allModulesDone(safeStatus);
 
       if (unlocked) {
         testBadge.className = "badge badge-complete";
-        testBadge.textContent = status.testComplete ? "Complete" : "Unlocked";
+        testBadge.textContent = safeStatus.testComplete ? "Complete" : "Unlocked";
         testLockedBtn.style.display = "none";
         testOpenBtn.style.display = "inline-flex";
       } else {
@@ -564,25 +633,89 @@
         testOpenBtn.style.display = "none";
       }
 
-      testInfo.textContent = status.testComplete
-        ? `Test complete. Score: ${status.testScore}`
+      testInfo.textContent = safeStatus.testComplete
+        ? `Test complete. Score: ${safeStatus.testScore}`
         : (unlocked ? "Unlocked." : "Locked.");
 
-      statusEl.textContent = "Status loaded from Google Sheets.";
+      if (sourceText) {
+        statusEl.textContent = sourceText;
+      }
     }
 
-    (async () => {
+    function renderLoadingShell() {
+      list.innerHTML = "";
+
+      MODULES.forEach(m => {
+        const card = document.createElement("div");
+        card.className = "module-card";
+        card.innerHTML = `
+          <div>
+            <div class="module-top">
+              <h4 class="module-title">${m.title}</h4>
+              <span class="badge badge-loading">Loading</span>
+            </div>
+            <div class="small">Video module</div>
+            <div class="module-meta">
+              <span class="meta-pill">Module ${m.id}</span>
+              <span class="meta-pill">90% required</span>
+            </div>
+          </div>
+          <div class="module-actions">
+            <a class="open-btn" href="player.html?m=${m.id}">Open Module</a>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+
+      completedCount.textContent = "0";
+      remainingCount.textContent = String(MODULES.length);
+      progressValue.textContent = "0%";
+      progressFill.style.width = "0%";
+      progressNote.textContent = `0 of ${MODULES.length} modules completed`;
+
+      testBadge.className = "badge badge-not";
+      testBadge.textContent = "Locked";
+      testLockedBtn.style.display = "inline-flex";
+      testOpenBtn.style.display = "none";
+      testInfo.textContent = "Checking status…";
+    }
+
+    async function loadFreshStatus() {
       try {
         const status = await apiGetStatus(username);
-        if (!status.ok) {
-          statusEl.textContent = "Error loading status: " + (status.error || "Unknown");
+
+        if (!status || !status.ok) {
+          statusEl.textContent = "Error loading status: " + ((status && status.error) || "Unknown");
           return;
         }
-        render(status);
+
+        const normalized = normalizeStatus(status);
+        safeWriteCache(normalized);
+        render(normalized, "Status loaded from Google Sheets.");
       } catch (err) {
         console.error(err);
-        statusEl.textContent = "Error loading status.";
+
+        const cached = safeReadCache();
+        if (cached) {
+          render(cached, "Showing saved status. Live refresh failed.");
+        } else {
+          statusEl.textContent = "Error loading status.";
+        }
       }
+    }
+
+    (function init() {
+      renderLoadingShell();
+
+      const cached = safeReadCache();
+
+      if (cached) {
+        render(cached, "Showing saved status. Refreshing from Google Sheets…");
+      } else {
+        render(makeEmptyStatus(), "Loading live status from Google Sheets…");
+      }
+
+      loadFreshStatus();
     })();
   </script>
 </body>
