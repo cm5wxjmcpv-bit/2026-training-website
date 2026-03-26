@@ -35,12 +35,12 @@ const USERS = [
 const MODULES = [
   {
     id: 1,
-    title: "Intro 5 mins",
+    title: "Intro (5 mins)",
     youtubeId: "BGlWc4pvXSQ"
   },
   {
     id: 2,
-    title: "Module 1 18.5 mins",
+    title: "Module 1 (18.5) mins",
     youtubeId: "PKEVCzlIo6o"
   },
   {
