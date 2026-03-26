@@ -35,7 +35,7 @@ const USERS = [
 const MODULES = [
   {
     id: 1,
-    title: "Intro",
+    title: "Intro 5 mins",
     youtubeId: "BGlWc4pvXSQ"
   },
   {
