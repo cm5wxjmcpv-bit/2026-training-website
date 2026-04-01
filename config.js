@@ -60,8 +60,8 @@ const MODULES = [
   },
   {
     id: 6,
-    title: "Module 6",
-    youtubeId: "aqz-KE-bpKQ"
+    title: "Module 5 (25.25 mins)",
+    youtubeId: "Od5tJW7NZK8"
   },
   {
     id: 7,
