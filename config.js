@@ -40,23 +40,23 @@ const MODULES = [
   },
   {
     id: 2,
-    title: "Module 1 (18.5) mins",
+    title: "Module 1 (18.5 mins)",
     youtubeId: "PKEVCzlIo6o"
   },
   {
     id: 3,
-    title: "Module 2 (22.08)",
+    title: "Module 2 (22.08 mins)",
     youtubeId: "pZPTGA1-CWg"
   },
   {
     id: 4,
-    title: "Module 3 (14.10)",
+    title: "Module 3 (14.10mins)",
     youtubeId: "Qa5zqYHRqso"
   },
   {
     id: 5,
-    title: "Module 5",
-    youtubeId: "aqz-KE-bpKQ"
+    title: "Module 4 (12 mins)",
+    youtubeId: "2uCIkj693I8"
   },
   {
     id: 6,
