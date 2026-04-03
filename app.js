@@ -76,8 +76,6 @@ async function apiLogTest(username, complete, score) {
 }
 
 function allModulesComplete(status) {
-  for (let i = 1; i <= 10; i++) {
-    if (!status.modules["m" + i]) return false;
-  }
-  return true;
+  if (!status || !status.modules || !Array.isArray(MODULES)) return false;
+  return MODULES.every(m => !!status.modules["m" + m.id]);
 }
