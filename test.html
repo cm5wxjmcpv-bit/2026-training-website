@@ -45,7 +45,7 @@
     const TEST_TITLE = "Defensive Driving / CMV Operations Comprehensive Test";
     const PASSING_SCORE = 80;
 
-    const QUESTIONS = [
+    const QUESTION_BANK = [
       { question: "What are the three main categories of controls on a CMV?", options: ["Engine, braking, steering", "Engine, primary, secondary", "Mechanical, electrical, hydraulic", "Driver, vehicle, cargo"], correctIndex: 1 },
       { question: "Engine controls are used for which of the following?", options: ["Steering and braking", "Starting/stopping and maintaining speed", "Cargo securement", "Mirror adjustment"], correctIndex: 1 },
       { question: "How long should a diesel engine warm up in cold weather?", options: ["1–2 minutes", "2–3 minutes", "5–10 minutes", "15 minutes"], correctIndex: 2 },
@@ -72,6 +72,13 @@
       { question: "When must cargo be rechecked after starting a trip?", options: ["10 miles", "25 miles", "50 miles", "100 miles"], correctIndex: 2 },
       { question: "Cargo must be secured using:", options: ["Any available material", "Only straps", "Proper securement systems", "Rope only"], correctIndex: 2 }
     ];
+
+    function getRandomQuestions(bank, count) {
+      const shuffled = [...bank].sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, count);
+    }
+
+    let QUESTIONS = getRandomQuestions(QUESTION_BANK, 25);
 
     const lock = document.getElementById("lock");
     const test = document.getElementById("test");
@@ -160,6 +167,8 @@
     };
 
     retakeBtn.onclick = () => {
+      QUESTIONS = getRandomQuestions(QUESTION_BANK, 25);
+      renderQuestions();
       quizForm.querySelectorAll('input[type="radio"]').forEach(input => {
         input.checked = false;
       });
