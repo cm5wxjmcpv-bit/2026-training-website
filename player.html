@@ -424,6 +424,7 @@
 
   <script src="https://www.youtube.com/iframe_api"></script>
   <script>
+    document.addEventListener("DOMContentLoaded", () => {
     const username = requireAuth();
     document.getElementById("who").textContent = `Signed in as ${username}`;
 
@@ -755,6 +756,7 @@
 
     window.addEventListener("beforeunload", () => {
       stopTimers();
+    });
     });
   </script>
 </body>
