@@ -39,6 +39,7 @@
   </div>
 
   <script>
+    document.addEventListener("DOMContentLoaded", () => {
     const username = requireAuth();
     document.getElementById("who").textContent = `Signed in as ${username}`;
 
@@ -175,6 +176,7 @@
       result.textContent = "";
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
+    });
   </script>
 </body>
 </html>
