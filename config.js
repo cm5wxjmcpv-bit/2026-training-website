@@ -36,23 +36,23 @@ const MODULES = [
   const MODULES = [
   {
     id: 1,
-    title: "Module 1",
-    youtubeId: "PASTE_VIDEO_ID_1"
+    title: "Module 1 — Introduction",
+    youtubeId: "-qXt8htJ9h4"
   },
   {
     id: 2,
-    title: "Module 2",
-    youtubeId: "PASTE_VIDEO_ID_2"
+    title: "Module 2 — Safety & Inspection",
+    youtubeId: "RS4K5FCL988"
   },
   {
     id: 3,
-    title: "Module 3",
-    youtubeId: "PASTE_VIDEO_ID_3"
+    title: "Module 3 — Basic Operations",
+    youtubeId: "TLeq0WikSmU"
   },
   {
     id: 4,
-    title: "Module 4",
-    youtubeId: "PASTE_VIDEO_ID_4"
+    title: "Module 4 — Advanced Driving",
+    youtubeId: "cMML4tQdVvY"
   }
 ];
 
