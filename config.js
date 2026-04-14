@@ -35,23 +35,23 @@ const USERS = [
 const MODULES = [
   {
     id: 1,
-    title: "Intro (5 mins)",
-    youtubeId: "BGlWc4pvXSQ"
+    title: "Module 1-3 (12 mins)",
+    youtubeId: "-qXt8htJ9h4"
   },
   {
     id: 2,
-    title: "Module 1 (18.5 mins)",
-    youtubeId: "PKEVCzlIo6o"
+    title: "Module 4-7 (15.5 mins)",
+    youtubeId: "RS4K5FCL988"
   },
   {
     id: 3,
-    title: "Module 2 (22.08 mins)",
-    youtubeId: "pZPTGA1-CWg"
+    title: "Module 8-10 (14 mins)",
+    youtubeId: "TLeq0WikSmU"
   },
   {
     id: 4,
-    title: "Module 3 (14.10mins)",
-    youtubeId: "Qa5zqYHRqso"
+    title: "Module 11-13 (15.5mins)",
+    youtubeId: "cMML4tQdVvY"
   },
   {
     id: 5,
