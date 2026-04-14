@@ -33,7 +33,6 @@ const USERS = [
 // ==============================
 
 const MODULES = [
-  const MODULES = [
   {
     id: 1,
     title: "Module 1 — Introduction",
