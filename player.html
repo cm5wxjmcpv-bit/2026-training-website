@@ -689,7 +689,7 @@
       guardTick = null;
     }
 
-    function onYouTubeIframeAPIReady() {
+    window.onYouTubeIframeAPIReady = function () {
       player = new YT.Player("player", {
         videoId: mod.youtubeId,
         playerVars: {
