@@ -33,40 +33,26 @@ const USERS = [
 // ==============================
 
 const MODULES = [
+  const MODULES = [
   {
     id: 1,
-    title: "Module 1-3 (12 mins)",
-    youtubeId: "-qXt8htJ9h4"
+    title: "Module 1",
+    youtubeId: "PASTE_VIDEO_ID_1"
   },
   {
     id: 2,
-    title: "Module 4-7 (15.5 mins)",
-    youtubeId: "RS4K5FCL988"
+    title: "Module 2",
+    youtubeId: "PASTE_VIDEO_ID_2"
   },
   {
     id: 3,
-    title: "Module 8-10 (14 mins)",
-    youtubeId: "TLeq0WikSmU"
+    title: "Module 3",
+    youtubeId: "PASTE_VIDEO_ID_3"
   },
   {
     id: 4,
-    title: "Module 11-13 (15.5mins)",
-    youtubeId: "cMML4tQdVvY"
-  },
-  {
-    id: 5,
-    title: "Module 4 (12 mins)",
-    youtubeId: "2uCIkj693I8"
-  },
-  {
-    id: 6,
-    title: "Module 5 (25.25 mins)",
-    youtubeId: "Od5tJW7NZK8"
-  },
-  {
-    id: 7,
-    title: "Module 6 (7.41 mins)",
-    youtubeId: "Ch9WP4p5vGs"
+    title: "Module 4",
+    youtubeId: "PASTE_VIDEO_ID_4"
   }
 ];
 
