@@ -103,7 +103,6 @@ button:hover{
 <thead>
 <tr>
 <th>Username</th>
-<th>Password</th>
 <th>Test Score</th>
 <th>Actions</th>
 </tr>
@@ -142,7 +141,14 @@ async function adminLogin(){
 const user = document.getElementById("adminUser").value
 const pass = document.getElementById("adminPass").value
 
-const res = await fetch(APP_SCRIPT_URL+"?action=adminLogin&username="+user+"&password="+pass)
+const res = await fetch(APP_SCRIPT_URL,{ 
+method:"POST",
+body:JSON.stringify({
+action:"adminLogin",
+username:user,
+password:pass
+})
+})
 
 const data = await res.json()
 
@@ -186,10 +192,9 @@ const row = document.createElement("tr")
 
 row.innerHTML=`
 <td>${s.username}</td>
-<td>${s.password}</td>
 <td>${s.testScore ?? ""}</td>
 <td class="actions">
-<button onclick="editStudent('${s.username}','${s.password}')">Edit</button>
+<button onclick="editStudent('${s.username}')">Edit</button>
 <button onclick="deleteStudent('${s.username}')">Delete</button>
 </td>
 `
@@ -245,12 +250,13 @@ loadStudents()
 
 
 
-function editStudent(user,pass){
+function editStudent(user){
 
 const newUser = prompt("Username",user)
-const newPass = prompt("Password",pass)
+if(!newUser) return
 
-if(!newUser || !newPass) return
+const newPass = prompt("New password (leave blank to keep existing)","")
+if(newPass === null) return
 
 fetch(APP_SCRIPT_URL,{
 method:"POST",
