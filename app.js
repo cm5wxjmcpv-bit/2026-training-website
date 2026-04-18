@@ -3,8 +3,6 @@ const STATUS_SHEET = "Status";
 const STUDENTS_SHEET = "Students";
 const ADMINS_SHEET = "Admins";
 
-const PASSWORD_SCHEME_PREFIX = "v1$";
-
 function doGet(e) {
   try {
     const action = ((e.parameter && e.parameter.action) || "").toLowerCase();
@@ -17,12 +15,16 @@ function doGet(e) {
       return json_(logModule_(e.parameter.username || "student1", Number(e.parameter.moduleId || 1)));
     }
 
+    if (action === "adminlogin") {
+      return json_(adminLogin_(e.parameter.username, e.parameter.password));
+    }
+
     if (action === "liststudents") {
       return json_(listStudents_());
     }
 
-    if (action === "adminlogin" || action === "validatelogin") {
-      return json_({ ok: false, error: "Use POST for login" });
+    if (action === "validatelogin") {
+      return json_(validateLogin_(e.parameter.username, e.parameter.password));
     }
 
     return json_({
@@ -61,14 +63,6 @@ function doPost(e) {
 
     if (action === "deletestudent") {
       return json_(deleteStudent_(data.username));
-    }
-
-    if (action === "adminlogin") {
-      return json_(adminLogin_(data.username, data.password));
-    }
-
-    if (action === "validatelogin") {
-      return json_(validateLogin_(data.username, data.password));
     }
 
     return json_({
@@ -114,67 +108,6 @@ function getStudentsSheet_() {
 
 function getAdminsSheet_() {
   return getSheetByName_(ADMINS_SHEET);
-}
-
-function makeSalt_() {
-  return Utilities.getUuid().replace(/-/g, "").slice(0, 16);
-}
-
-function sha256Hex_(text) {
-  const bytes = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    text,
-    Utilities.Charset.UTF_8
-  );
-
-  return bytes.map(function(b) {
-    const v = (b < 0 ? b + 256 : b).toString(16);
-    return v.length === 1 ? "0" + v : v;
-  }).join("");
-}
-
-function hashPassword_(plainPassword, salt) {
-  const normalized = (plainPassword || "").toString();
-  const s = (salt || makeSalt_()).toString();
-  const digest = sha256Hex_(s + "|" + normalized);
-  return PASSWORD_SCHEME_PREFIX + s + "$" + digest;
-}
-
-function isHashedPassword_(storedValue) {
-  return (storedValue || "").toString().indexOf(PASSWORD_SCHEME_PREFIX) === 0;
-}
-
-function verifyPassword_(plainPassword, storedValue) {
-  const stored = (storedValue || "").toString();
-
-  if (!isHashedPassword_(stored)) {
-    return (plainPassword || "").toString() === stored;
-  }
-
-  const parts = stored.split("$");
-  if (parts.length !== 3) return false;
-
-  const salt = parts[1];
-  const expected = parts[2];
-  const actual = sha256Hex_(salt + "|" + (plainPassword || "").toString());
-  return actual === expected;
-}
-
-function findUserRowByUsername_(sh, username) {
-  const lastRow = sh.getLastRow();
-  if (lastRow < 2) return -1;
-
-  const rows = sh.getRange(2, 1, lastRow - 1, 1).getValues();
-  const target = (username || "").toString().trim().toLowerCase();
-
-  for (let i = 0; i < rows.length; i++) {
-    const existing = (rows[i][0] || "").toString().trim().toLowerCase();
-    if (existing === target) {
-      return i + 2;
-    }
-  }
-
-  return -1;
 }
 
 function ensureUserRow_(username) {
@@ -278,38 +211,27 @@ function logTest_(username, complete, score) {
   return getStatus_(username);
 }
 
-function validateCredentialsAndMaybeMigrate_(sh, username, password) {
-  const row = findUserRowByUsername_(sh, username);
-  if (row === -1) {
-    return { ok: false };
-  }
-
-  const values = sh.getRange(row, 1, 1, 2).getValues()[0];
-  const storedUsername = values[0] || username;
-  const storedPassword = (values[1] || "").toString();
-  const plainPassword = (password || "").toString();
-
-  if (!verifyPassword_(plainPassword, storedPassword)) {
-    return { ok: false };
-  }
-
-  if (!isHashedPassword_(storedPassword)) {
-    sh.getRange(row, 2).setValue(hashPassword_(plainPassword));
-  }
-
-  return { ok: true, username: storedUsername };
-}
-
 function adminLogin_(username, password) {
   if (!username || !password) {
     return { ok: false, error: "Missing username or password" };
   }
 
-  const sh = getAdminsSheet_();
-  const result = validateCredentialsAndMaybeMigrate_(sh, username, password);
+  const inputUsername = username.toString().trim().toLowerCase();
+  const inputPassword = password.toString();
 
-  if (result.ok) {
-    return { ok: true, username: result.username };
+  const sh = getAdminsSheet_();
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return { ok: false, error: "No admins found" };
+
+  const rows = sh.getRange(2, 1, lastRow - 1, 2).getValues();
+
+  for (let i = 0; i < rows.length; i++) {
+    const u = (rows[i][0] || "").toString().trim().toLowerCase();
+    const p = (rows[i][1] || "").toString();
+
+    if (u === inputUsername && p === inputPassword) {
+      return { ok: true, username: rows[i][0] };
+    }
   }
 
   return { ok: false, error: "Invalid admin login" };
@@ -320,11 +242,22 @@ function validateLogin_(username, password) {
     return { ok: false, error: "Missing username or password" };
   }
 
-  const sh = getStudentsSheet_();
-  const result = validateCredentialsAndMaybeMigrate_(sh, username, password);
+  const inputUsername = username.toString().trim().toLowerCase();
+  const inputPassword = password.toString();
 
-  if (result.ok) {
-    return { ok: true, username: result.username };
+  const sh = getStudentsSheet_();
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return { ok: false, error: "No students found" };
+
+  const rows = sh.getRange(2, 1, lastRow - 1, 2).getValues();
+
+  for (let i = 0; i < rows.length; i++) {
+    const u = (rows[i][0] || "").toString().trim().toLowerCase();
+    const p = (rows[i][1] || "").toString();
+
+    if (u === inputUsername && p === inputPassword) {
+      return { ok: true, username: rows[i][0] };
+    }
   }
 
   return { ok: false, error: "Invalid username or password" };
@@ -363,11 +296,12 @@ function listStudents_() {
   const students = studentRows
     .filter(function(r) { return r[0]; })
     .map(function(r) {
-      const uname = r[0];
+      const username = r[0];
       return {
-        username: uname,
+        username: username,
+        password: r[1],
         updatedAt: r[2] || "",
-        testScore: scoreMap[(uname || "").toString().trim().toLowerCase()] || ""
+        testScore: scoreMap[(username || "").toString().trim().toLowerCase()] || ""
       };
     });
 
@@ -392,15 +326,14 @@ function addStudent_(username, password) {
     }
   }
 
-  const hashedPassword = hashPassword_(password);
-  sh.appendRow([username, hashedPassword, new Date()]);
+  sh.appendRow([username, password, new Date()]);
   ensureUserRow_(username);
 
   return { ok: true };
 }
 
 function updateStudent_(username, newUsername, password) {
-  if (!username || !newUsername) {
+  if (!username || !newUsername || !password) {
     return { ok: false, error: "Missing fields" };
   }
 
@@ -413,13 +346,8 @@ function updateStudent_(username, newUsername, password) {
   for (let i = 0; i < rows.length; i++) {
     const existing = (rows[i][0] || "").toString().trim();
     if (existing === username) {
-      const nextPassword = (password || "").toString();
       sh.getRange(i + 2, 1).setValue(newUsername);
-
-      if (nextPassword) {
-        sh.getRange(i + 2, 2).setValue(hashPassword_(nextPassword));
-      }
-
+      sh.getRange(i + 2, 2).setValue(password);
       sh.getRange(i + 2, 3).setValue(new Date());
       ensureUserRow_(newUsername);
       return { ok: true };

@@ -2,15 +2,12 @@ const AUTH_STORAGE_KEY = "cdl_username";
 
 async function login(username, password) {
   try {
-    const res = await fetch(APP_SCRIPT_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        action: "validateLogin",
-        username,
-        password
-      })
-    });
+    const url = APP_SCRIPT_URL +
+      "?action=validateLogin" +
+      "&username=" + encodeURIComponent(username) +
+      "&password=" + encodeURIComponent(password);
 
+    const res = await fetch(url);
     const data = await res.json();
 
     if (data && data.ok) {
