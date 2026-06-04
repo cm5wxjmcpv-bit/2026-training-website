@@ -352,6 +352,24 @@
       text-align:left;
     }
 
+    .video-embed{
+      position:relative;
+      width:100%;
+      aspect-ratio:16 / 9;
+      overflow:hidden;
+      border-radius:14px;
+      background:#10263a;
+      box-shadow:0 10px 20px rgba(16,38,58,.12);
+    }
+
+    .video-embed iframe{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      border:0;
+    }
+
     .video-placeholder{
       border:2px dashed #c9d6e2;
       border-radius:14px;
@@ -508,15 +526,44 @@
       <div class="section-header">
         <div>
           <h3>Pre-Trip Videos</h3>
-          <p>This section is ready for your public pre-trip video links when you want to add them.</p>
+          <p>Watch public pre-trip study videos before class or before practicing your inspection.</p>
         </div>
       </div>
 
       <div class="grid">
         <article class="card video-card">
+          <h4>Air Brake Test Video</h4>
+          <p>Review the CDL air brake test procedure before class or before practicing your pre-trip inspection.</p>
+
+          <div class="video-embed">
+            <iframe
+              src="https://www.youtube.com/embed/bDv3-0drOSQ"
+              title="Air Brake Test Video"
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen></iframe>
+          </div>
+
+          <div class="actions">
+            <a class="btn-secondary" href="https://youtu.be/bDv3-0drOSQ?si=uufekytgX2r-pQjU" target="_blank" rel="noopener">Open on YouTube</a>
+          </div>
+        </article>
+
+        <article class="card video-card">
           <h4>Class A Pre-Trip Video</h4>
-          <div class="video-placeholder">
-            Class A pre-trip video coming soon.
+          <div class="video-embed">
+            <iframe
+              src="https://www.youtube.com/embed/6DSvlh-zHu4"
+              title="Class A Pre-Trip Video"
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerpolicy="strict-origin-when-cross-origin"
+              allowfullscreen></iframe>
+          </div>
+
+          <div class="actions">
+            <a class="btn-secondary" href="https://youtu.be/6DSvlh-zHu4?si=DJDkSpiEpo5ktgia" target="_blank" rel="noopener">Open on YouTube</a>
           </div>
         </article>
 
