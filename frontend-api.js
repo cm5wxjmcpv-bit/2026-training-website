@@ -17,7 +17,7 @@ const DEFAULT_CLASSES = [
     passingScore: 80,
     requiredWatchPercent: 0.9,
     sortOrder: 2,
-    active: true,
+    active: false,
   },
   {
     id: "passenger",
@@ -26,7 +26,7 @@ const DEFAULT_CLASSES = [
     passingScore: 80,
     requiredWatchPercent: 0.9,
     sortOrder: 3,
-    active: true,
+    active: false,
   },
   {
     id: "school-bus",
@@ -35,7 +35,7 @@ const DEFAULT_CLASSES = [
     passingScore: 80,
     requiredWatchPercent: 0.9,
     sortOrder: 4,
-    active: true,
+    active: false,
   },
   {
     id: "tanker",
@@ -44,7 +44,7 @@ const DEFAULT_CLASSES = [
     passingScore: 80,
     requiredWatchPercent: 0.9,
     sortOrder: 5,
-    active: true,
+    active: false,
   },
   {
     id: "hazmat",
@@ -53,7 +53,7 @@ const DEFAULT_CLASSES = [
     passingScore: 80,
     requiredWatchPercent: 0.9,
     sortOrder: 6,
-    active: true,
+    active: false,
   },
 ];
 const DEFAULT_MODULES = (typeof MODULES !== "undefined" ? MODULES : []).map(
@@ -155,7 +155,8 @@ function normalizeWatchPercent(value) {
   return n > 1 ? n / 100 : n;
 }
 function allModulesComplete(status) {
-  if (!status || !Array.isArray(status.modules)) return false;
+  if (!status || !Array.isArray(status.modules) || status.modules.length === 0)
+    return false;
   return status.modules.every((m) => !!m.complete);
 }
 function extractYouTubeId(value) {

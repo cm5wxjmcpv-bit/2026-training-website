@@ -15,11 +15,11 @@ const ADMIN_EMAIL = "";
 
 const DEFAULT_CLASSES = [
   [DEFAULT_CLASS_ID, "Class A and B", "CDL Class A/B ELDT training", 80, 0.9, 1, true],
-  ["class-b-to-a", "Class B to A Upgrade", "Upgrade training from Class B to Class A", 80, 0.9, 2, true],
-  ["passenger", "Passenger Endorsement", "Passenger endorsement training", 80, 0.9, 3, true],
-  ["school-bus", "School Bus Endorsement", "School bus endorsement training", 80, 0.9, 4, true],
-  ["tanker", "Tanker Endorsement", "Tanker endorsement training", 80, 0.9, 5, true],
-  ["hazmat", "Hazmat Endorsement", "Hazmat endorsement training", 80, 0.9, 6, true]
+  ["class-b-to-a", "Class B to A Upgrade", "Upgrade training from Class B to Class A", 80, 0.9, 2, false],
+  ["passenger", "Passenger Endorsement", "Passenger endorsement training", 80, 0.9, 3, false],
+  ["school-bus", "School Bus Endorsement", "School bus endorsement training", 80, 0.9, 4, false],
+  ["tanker", "Tanker Endorsement", "Tanker endorsement training", 80, 0.9, 5, false],
+  ["hazmat", "Hazmat Endorsement", "Hazmat endorsement training", 80, 0.9, 6, false]
 ];
 const DEFAULT_MODULES = [
   ["1", DEFAULT_CLASS_ID, "Module 1 — Introduction", "-qXt8htJ9h4", 1, 0.9, true],
