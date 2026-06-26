@@ -2,383 +2,57 @@ const SPREADSHEET_ID = "1bf3KX4t0xdduF_l8yCnMhOrlixK5hEmcp_br2U91Y30";
 const STATUS_SHEET = "Status";
 const STUDENTS_SHEET = "Students";
 const ADMINS_SHEET = "Admins";
-
-function doGet(e) {
-  try {
-    const action = ((e.parameter && e.parameter.action) || "").toLowerCase();
-
-    if (action === "getstatus") {
-      return json_(getStatus_(e.parameter.username));
-    }
-
-    if (action === "testlogmodule") {
-      return json_(logModule_(e.parameter.username || "student1", Number(e.parameter.moduleId || 1)));
-    }
-
-    if (action === "adminlogin") {
-      return json_(adminLogin_(e.parameter.username, e.parameter.password));
-    }
-
-    if (action === "liststudents") {
-      return json_(listStudents_());
-    }
-
-    if (action === "validatelogin") {
-      return json_(validateLogin_(e.parameter.username, e.parameter.password));
-    }
-
-    return json_({
-      ok: false,
-      error: "Unknown action"
-    });
-  } catch (err) {
-    return json_({
-      ok: false,
-      error: String(err)
-    });
-  }
-}
-
-function doPost(e) {
-  try {
-    const raw = (e.postData && e.postData.contents) ? e.postData.contents : "{}";
-    const data = JSON.parse(raw);
-    const action = (data.action || "").toLowerCase();
-
-    if (action === "logmodule") {
-      return json_(logModule_(data.username, Number(data.moduleId)));
-    }
-
-    if (action === "logtest") {
-      return json_(logTest_(data.username, data.complete === true || data.complete === "true", Number(data.score)));
-    }
-
-    if (action === "addstudent") {
-      return json_(addStudent_(data.username, data.password));
-    }
-
-    if (action === "updatestudent") {
-      return json_(updateStudent_(data.username, data.newUsername, data.password));
-    }
-
-    if (action === "deletestudent") {
-      return json_(deleteStudent_(data.username));
-    }
-
-    return json_({
-      ok: false,
-      error: "Unknown action"
-    });
-  } catch (err) {
-    return json_({
-      ok: false,
-      error: String(err)
-    });
-  }
-}
-
-function getSheetByName_(name) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sh = ss.getSheetByName(name);
-  if (!sh) throw new Error('Missing sheet tab named "' + name + '"');
-  return sh;
-}
-
-function getHeaders_(sh) {
-  const lastColumn = sh.getLastColumn();
-  if (lastColumn < 1) throw new Error("Sheet has no header row");
-  return sh.getRange(1, 1, 1, lastColumn).getValues()[0].map(function(header) {
-    return (header || "").toString().trim();
-  });
-}
-
-function requireHeader_(headers, name) {
-  const index = headers.indexOf(name);
-  if (index === -1) throw new Error("Missing header: " + name);
-  return index + 1;
-}
-
-function getStatusSheet_() {
-  return getSheetByName_(STATUS_SHEET);
-}
-
-function getStudentsSheet_() {
-  return getSheetByName_(STUDENTS_SHEET);
-}
-
-function getAdminsSheet_() {
-  return getSheetByName_(ADMINS_SHEET);
-}
-
-function ensureUserRow_(username) {
-  if (!username) throw new Error("Missing username");
-
-  const sh = getStatusSheet_();
-  const lastRow = sh.getLastRow();
-  const width = Math.max(sh.getLastColumn(), 14);
-
-  if (lastRow < 2) {
-    const newRow = new Array(width).fill("");
-    newRow[0] = username;
-    sh.appendRow(newRow);
-    return sh.getLastRow();
-  }
-
-  const usernames = sh.getRange(2, 1, lastRow - 1, 1).getValues();
-
-  for (let i = 0; i < usernames.length; i++) {
-    const existing = (usernames[i][0] || "").toString().trim().toLowerCase();
-    if (existing === username.toLowerCase()) {
-      return i + 2;
-    }
-  }
-
-  const newRow = new Array(width).fill("");
-  newRow[0] = username;
-  sh.appendRow(newRow);
-  return sh.getLastRow();
-}
-
-function getStatus_(username) {
-  const sh = getStatusSheet_();
-  const row = ensureUserRow_(username);
-  const headers = getHeaders_(sh);
-  const vals = sh.getRange(row, 1, 1, sh.getLastColumn()).getValues()[0];
-
-  const out = {
-    ok: true,
-    username: vals[0] || username,
-    modules: {},
-    testComplete: false,
-    testScore: ""
-  };
-
-  for (let m = 1; m <= 10; m++) {
-    const idx = headers.indexOf("m" + m);
-    out.modules["m" + m] = idx !== -1
-      ? (vals[idx] || "").toString().toLowerCase() === "complete"
-      : false;
-  }
-
-  const testCompleteIdx = headers.indexOf("testComplete");
-  const testScoreIdx = headers.indexOf("testScore");
-
-  out.testComplete = testCompleteIdx !== -1
-    ? (vals[testCompleteIdx] || "").toString().toLowerCase() === "complete"
-    : false;
-
-  out.testScore = testScoreIdx !== -1
-    ? (vals[testScoreIdx] || "")
-    : "";
-
-  return out;
-}
-
-function logModule_(username, moduleId) {
-  if (!username) throw new Error("Missing username");
-  if (!moduleId || moduleId < 1 || moduleId > 10) throw new Error("moduleId must be 1..10");
-
-  const sh = getStatusSheet_();
-  const row = ensureUserRow_(username);
-  const headers = getHeaders_(sh);
-
-  const moduleCol = requireHeader_(headers, "m" + moduleId);
-  const updatedAtCol = requireHeader_(headers, "updatedAt");
-
-  sh.getRange(row, moduleCol).setValue("complete");
-  sh.getRange(row, updatedAtCol).setValue(new Date());
-  SpreadsheetApp.flush();
-
-  return getStatus_(username);
-}
-
-function logTest_(username, complete, score) {
-  if (!username) throw new Error("Missing username");
-
-  const sh = getStatusSheet_();
-  const row = ensureUserRow_(username);
-  const headers = getHeaders_(sh);
-
-  const testCompleteCol = requireHeader_(headers, "testComplete");
-  const testScoreCol = requireHeader_(headers, "testScore");
-  const updatedAtCol = requireHeader_(headers, "updatedAt");
-
-  sh.getRange(row, testCompleteCol).setValue(complete ? "complete" : "");
-  sh.getRange(row, testScoreCol).setValue(isNaN(score) ? "" : score);
-  sh.getRange(row, updatedAtCol).setValue(new Date());
-  SpreadsheetApp.flush();
-
-  return getStatus_(username);
-}
-
-function adminLogin_(username, password) {
-  if (!username || !password) {
-    return { ok: false, error: "Missing username or password" };
-  }
-
-  const inputUsername = username.toString().trim().toLowerCase();
-  const inputPassword = password.toString();
-
-  const sh = getAdminsSheet_();
-  const lastRow = sh.getLastRow();
-  if (lastRow < 2) return { ok: false, error: "No admins found" };
-
-  const rows = sh.getRange(2, 1, lastRow - 1, 2).getValues();
-
-  for (let i = 0; i < rows.length; i++) {
-    const u = (rows[i][0] || "").toString().trim().toLowerCase();
-    const p = (rows[i][1] || "").toString();
-
-    if (u === inputUsername && p === inputPassword) {
-      return { ok: true, username: rows[i][0] };
-    }
-  }
-
-  return { ok: false, error: "Invalid admin login" };
-}
-
-function validateLogin_(username, password) {
-  if (!username || !password) {
-    return { ok: false, error: "Missing username or password" };
-  }
-
-  const inputUsername = username.toString().trim().toLowerCase();
-  const inputPassword = password.toString();
-
-  const sh = getStudentsSheet_();
-  const lastRow = sh.getLastRow();
-  if (lastRow < 2) return { ok: false, error: "No students found" };
-
-  const rows = sh.getRange(2, 1, lastRow - 1, 2).getValues();
-
-  for (let i = 0; i < rows.length; i++) {
-    const u = (rows[i][0] || "").toString().trim().toLowerCase();
-    const p = (rows[i][1] || "").toString();
-
-    if (u === inputUsername && p === inputPassword) {
-      return { ok: true, username: rows[i][0] };
-    }
-  }
-
-  return { ok: false, error: "Invalid username or password" };
-}
-
-function listStudents_() {
-  const studentsSh = getStudentsSheet_();
-  const studentsLastRow = studentsSh.getLastRow();
-
-  if (studentsLastRow < 2) {
-    return { ok: true, students: [] };
-  }
-
-  const studentRows = studentsSh.getRange(2, 1, studentsLastRow - 1, 3).getValues();
-
-  const statusSh = getStatusSheet_();
-  const statusLastRow = statusSh.getLastRow();
-  const statusHeaders = getHeaders_(statusSh);
-
-  const usernameIdx = statusHeaders.indexOf("username");
-  const testScoreIdx = statusHeaders.indexOf("testScore");
-
-  const scoreMap = {};
-
-  if (statusLastRow >= 2 && usernameIdx !== -1 && testScoreIdx !== -1) {
-    const statusRows = statusSh.getRange(2, 1, statusLastRow - 1, statusSh.getLastColumn()).getValues();
-
-    statusRows.forEach(function(r) {
-      const uname = (r[usernameIdx] || "").toString().trim().toLowerCase();
-      if (uname) {
-        scoreMap[uname] = r[testScoreIdx] || "";
-      }
-    });
-  }
-
-  const students = studentRows
-    .filter(function(r) { return r[0]; })
-    .map(function(r) {
-      const username = r[0];
-      return {
-        username: username,
-        password: r[1],
-        updatedAt: r[2] || "",
-        testScore: scoreMap[(username || "").toString().trim().toLowerCase()] || ""
-      };
-    });
-
-  return { ok: true, students: students };
-}
-
-function addStudent_(username, password) {
-  if (!username || !password) {
-    return { ok: false, error: "Missing username or password" };
-  }
-
-  const sh = getStudentsSheet_();
-  const lastRow = sh.getLastRow();
-
-  if (lastRow >= 2) {
-    const rows = sh.getRange(2, 1, lastRow - 1, 1).getValues();
-    for (let i = 0; i < rows.length; i++) {
-      const existing = (rows[i][0] || "").toString().trim().toLowerCase();
-      if (existing === username.toLowerCase()) {
-        return { ok: false, error: "Student already exists" };
-      }
-    }
-  }
-
-  sh.appendRow([username, password, new Date()]);
-  ensureUserRow_(username);
-
-  return { ok: true };
-}
-
-function updateStudent_(username, newUsername, password) {
-  if (!username || !newUsername || !password) {
-    return { ok: false, error: "Missing fields" };
-  }
-
-  const sh = getStudentsSheet_();
-  const lastRow = sh.getLastRow();
-  if (lastRow < 2) return { ok: false, error: "No students found" };
-
-  const rows = sh.getRange(2, 1, lastRow - 1, 3).getValues();
-
-  for (let i = 0; i < rows.length; i++) {
-    const existing = (rows[i][0] || "").toString().trim();
-    if (existing === username) {
-      sh.getRange(i + 2, 1).setValue(newUsername);
-      sh.getRange(i + 2, 2).setValue(password);
-      sh.getRange(i + 2, 3).setValue(new Date());
-      ensureUserRow_(newUsername);
-      return { ok: true };
-    }
-  }
-
-  return { ok: false, error: "Student not found" };
-}
-
-function deleteStudent_(username) {
-  if (!username) return { ok: false, error: "Missing username" };
-
-  const sh = getStudentsSheet_();
-  const lastRow = sh.getLastRow();
-  if (lastRow < 2) return { ok: false, error: "No students found" };
-
-  const rows = sh.getRange(2, 1, lastRow - 1, 1).getValues();
-
-  for (let i = 0; i < rows.length; i++) {
-    const existing = (rows[i][0] || "").toString().trim();
-    if (existing === username) {
-      sh.deleteRow(i + 2);
-      return { ok: true };
-    }
-  }
-
-  return { ok: false, error: "Student not found" };
-}
-
-function json_(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+const CLASSES_SHEET = "Classes";
+const MODULES_SHEET = "Modules";
+const TEST_QUESTIONS_SHEET = "TestQuestions";
+const STUDENT_CLASSES_SHEET = "StudentClasses";
+const PROGRESS_SHEET = "Progress";
+const TEST_RESULTS_SHEET = "TestResults";
+const SIGNUP_REQUESTS_SHEET = "SignupRequests";
+const DEFAULT_CLASS_ID = "class-a-b";
+const ADMIN_EMAIL = "";
+// Set this to the admin email address before deploying Apps Script to enable signup and test-completion notifications.
+
+const DEFAULT_CLASSES = [
+  [DEFAULT_CLASS_ID, "Class A and B", "CDL Class A/B ELDT training", 80, 0.9, 1, true],
+  ["class-b-to-a", "Class B to A Upgrade", "Upgrade training from Class B to Class A", 80, 0.9, 2, true],
+  ["passenger", "Passenger Endorsement", "Passenger endorsement training", 80, 0.9, 3, true],
+  ["school-bus", "School Bus Endorsement", "School bus endorsement training", 80, 0.9, 4, true],
+  ["tanker", "Tanker Endorsement", "Tanker endorsement training", 80, 0.9, 5, true],
+  ["hazmat", "Hazmat Endorsement", "Hazmat endorsement training", 80, 0.9, 6, true]
+];
+const DEFAULT_MODULES = [
+  ["1", DEFAULT_CLASS_ID, "Module 1 — Introduction", "-qXt8htJ9h4", 1, 0.9, true],
+  ["2", DEFAULT_CLASS_ID, "Module 2 — Safety & Inspection", "RS4K5FCL988", 2, 0.9, true],
+  ["3", DEFAULT_CLASS_ID, "Module 3 — Basic Operations", "TLeq0WikSmU", 3, 0.9, true],
+  ["4", DEFAULT_CLASS_ID, "Module 4 — Advanced Driving", "cMML4tQdVvY", 4, 0.9, true]
+];
+const DEFAULT_TEST_QUESTIONS = [
+["q1",DEFAULT_CLASS_ID,"What is the purpose of ELDT?","Increase CDL costs","Reduce crashes and standardize training","Replace skills testing","Eliminate permits",1,1,true],["q2",DEFAULT_CLASS_ID,"What must be completed before taking the CDL skills test?","Only driving hours","Only classroom training","ELDT theory and BTW training","Medical exam only",2,2,true],["q3",DEFAULT_CLASS_ID,"What is the minimum passing score for ELDT theory testing?","70%","75%","80%","85%",2,3,true],["q4",DEFAULT_CLASS_ID,"Normal air pressure range for air brake systems is:","50–75 PSI","80–100 PSI","100–125 PSI","130–150 PSI",2,4,true],["q5",DEFAULT_CLASS_ID,"What should you do if engine temperature is too high?","Keep driving","Increase speed","Stop the vehicle","Turn off lights",2,5,true],["q6",DEFAULT_CLASS_ID,"What is the purpose of a pre-trip inspection?","Save fuel","Check route","Ensure vehicle safety","Clean the truck",2,6,true],["q7",DEFAULT_CLASS_ID,"When should a driver complete a pre-trip inspection?","Once a week","Before every trip","After fueling","Only if problems occur",1,7,true],["q8",DEFAULT_CLASS_ID,"What does DVIR stand for?","Driver Vehicle Inspection Report","Daily Vehicle Incident Record","Driver Violation Information Report","Department Vehicle Inspection Record",0,8,true],["q9",DEFAULT_CLASS_ID,"Following distance should increase based on:","Vehicle color","Driver experience","Vehicle weight and conditions","Time of day only",2,9,true],["q10",DEFAULT_CLASS_ID,"Mirrors should be checked approximately every:","1–2 seconds","5–8 seconds","15–20 seconds","30 seconds",1,10,true],["q11",DEFAULT_CLASS_ID,"Off-tracking refers to:","Losing control","Trailer wheels following a tighter path","Engine failure","Tire wear",1,11,true],["q12",DEFAULT_CLASS_ID,"What is the purpose of engine braking?","Increase speed","Reduce brake wear","Improve fuel economy only","Replace service brakes",1,12,true],["q13",DEFAULT_CLASS_ID,"Double clutching is used to:","Increase speed","Match gear speeds","Reduce fuel use","Turn the vehicle",1,13,true],["q14",DEFAULT_CLASS_ID,"What does GOAL stand for?","Go Over And Leave","Get Out And Look","Get On And Load","Go On And Learn",1,14,true],["q15",DEFAULT_CLASS_ID,"Which type of backing is most dangerous?","Straight","Sight-side","Blind-side","Offset",2,15,true],["q16",DEFAULT_CLASS_ID,"What is the safest driving approach?","Aggressive driving","Defensive driving","Fast driving","Minimal awareness",1,16,true],["q17",DEFAULT_CLASS_ID,"What is required after 8 hours of driving time?","Fuel stop","30-minute break","10-hour break","Inspection",1,17,true],["q18",DEFAULT_CLASS_ID,"Maximum driving time allowed under HOS rules is:","10 hours","11 hours","12 hours","14 hours",1,18,true],["q19",DEFAULT_CLASS_ID,"What should you do during a tire blowout?","Slam brakes","Turn sharply","Hold steering wheel and slow gradually","Accelerate",2,19,true],["q20",DEFAULT_CLASS_ID,"What is the first priority after a crash?","Call employer","Document damage","Protect life and secure the scene","Move vehicle immediately",2,20,true],["q21",DEFAULT_CLASS_ID,"Which of the following is part of a proper pre-trip inspection?","Checking radio stations","Inspecting fluids, tires, and brakes","Adjusting seat only","Cleaning mirrors only",1,21,true],["q22",DEFAULT_CLASS_ID,"Which of the following is a common sign of driver fatigue?","Increased awareness","Faster reaction time","Yawning and drifting lanes","Improved focus",2,22,true],["q23",DEFAULT_CLASS_ID,"Which document must a CDL driver carry at all times?","Birth certificate","CDL license and medical card","Social media account","Insurance bill only",1,23,true],["q24",DEFAULT_CLASS_ID,"What is the correct action during brake failure?","Speed up","Turn off engine immediately","Downshift and use engine braking","Jump out of the vehicle",2,24,true],["q25",DEFAULT_CLASS_ID,"When must cargo be inspected during a trip?","Only at the end of the trip","Only if a problem occurs","Before trip, within first 50 miles, and periodically","Once per week",2,25,true]
+];
+function doGet(e){try{setupSheets_();const p=e.parameter||{},a=(p.action||"").toLowerCase();const m={validatelogin:()=>validateLogin_(p.username,p.password),adminlogin:()=>adminLogin_(p.username,p.password),liststudents:()=>listStudents_(),getstatus:()=>getStatus_(p.username,p.classId),getstudentdashboard:()=>getStudentDashboard_(p.username),listclasses:()=>listClasses_(p.activeOnly),listmodules:()=>listModules_(p.classId,p.activeOnly),listtestquestions:()=>listTestQuestions_(p.classId,p.activeOnly),setupsheets:()=>setupSheets_(),migrateexistingdatatoclassa:()=>migrateExistingDataToClassA_()};return json_((m[a]||(()=>({ok:false,error:"Unknown action"})))());}catch(err){return json_({ok:false,error:err.message||String(err)});}}
+function doPost(e){try{setupSheets_();const d=JSON.parse((e.postData&&e.postData.contents)||"{}");const a=(d.action||"").toLowerCase();const m={addstudent:()=>addStudent_(d),updatestudent:()=>updateStudent_(d),deletestudent:()=>archiveStudent_(d.username),archivestudent:()=>archiveStudent_(d.username),logmodule:()=>logModule_(d.username,d.classId,d.moduleId),logtest:()=>logTest_(d.username,d.classId,d.complete,d.score),saveclass:()=>saveClass_(d),deleteclass:()=>deactivateById_(CLASSES_SHEET,d.id),deactivateclass:()=>deactivateById_(CLASSES_SHEET,d.id),savemodule:()=>saveModule_(d),deletemodule:()=>deactivateById_(MODULES_SHEET,d.id),deactivatemodule:()=>deactivateById_(MODULES_SHEET,d.id),savetestquestion:()=>saveTestQuestion_(d),deletetestquestion:()=>deactivateById_(TEST_QUESTIONS_SHEET,d.id),deactivatetestquestion:()=>deactivateById_(TEST_QUESTIONS_SHEET,d.id),submitsignuprequest:()=>submitSignupRequest_(d)};return json_((m[a]||(()=>({ok:false,error:"Unknown action"})))());}catch(err){return json_({ok:false,error:err.message||String(err)});}}
+function ss_(){return SpreadsheetApp.openById(SPREADSHEET_ID);} function sh_(n){return ss_().getSheetByName(n)||ss_().insertSheet(n);} function headers_(sh){return sh.getRange(1,1,1,Math.max(sh.getLastColumn(),1)).getValues()[0].map(String);} function ensureHeaders_(n,hs){const sh=sh_(n);if(sh.getLastRow()<1)sh.appendRow(hs);const h=headers_(sh);hs.forEach(x=>{if(h.indexOf(x)===-1)sh.getRange(1,sh.getLastColumn()+1).setValue(x);});return sh;} function rowObjs_(n){const sh=sh_(n),h=headers_(sh),lr=sh.getLastRow();if(lr<2)return[];return sh.getRange(2,1,lr-1,sh.getLastColumn()).getValues().map((r,i)=>({row:i+2,raw:r,obj:Object.fromEntries(h.map((k,j)=>[k,r[j]]))}));} function active_(v){return v===""||v===true||String(v).toLowerCase()==="true";} function id_(){return Utilities.getUuid();}
+function setupSheets_(){ensureHeaders_(STUDENTS_SHEET,["username","password","updatedAt","fullNameOnLicense","licenseNumber","dob","active","archivedAt"]);ensureHeaders_(ADMINS_SHEET,["username","password"]);ensureHeaders_(STATUS_SHEET,["username","m1","m2","m3","m4","m5","m6","m7","m8","m9","m10","testComplete","testScore","updatedAt"]);ensureHeaders_(CLASSES_SHEET,["id","title","description","passingScore","requiredWatchPercent","sortOrder","active","updatedAt"]);ensureHeaders_(MODULES_SHEET,["id","classId","title","youtubeId","sortOrder","requiredWatchPercent","active","updatedAt"]);ensureHeaders_(TEST_QUESTIONS_SHEET,["id","classId","question","optionA","optionB","optionC","optionD","correctIndex","sortOrder","active","updatedAt"]);ensureHeaders_(STUDENT_CLASSES_SHEET,["username","classId","active","updatedAt"]);ensureHeaders_(PROGRESS_SHEET,["username","classId","moduleId","complete","updatedAt"]);ensureHeaders_(TEST_RESULTS_SHEET,["username","classId","complete","score","passed","updatedAt"]);ensureHeaders_(SIGNUP_REQUESTS_SHEET,["createdAt","fullNameOnLicense","licenseNumber","dob","requestedClassId","requestedClassTitle","status"]);seed_(CLASSES_SHEET,DEFAULT_CLASSES);seed_(MODULES_SHEET,DEFAULT_MODULES);seed_(TEST_QUESTIONS_SHEET,DEFAULT_TEST_QUESTIONS);return{ok:true};}
+function seed_(sheet,rows){const sh=sh_(sheet),ids={};rowObjs_(sheet).forEach(r=>ids[String(r.obj.id)]=true);rows.forEach(r=>{if(!ids[String(r[0])])sh.appendRow(r.concat([new Date()]));});}
+function findStudent_(u){const key=String(u||"").trim().toLowerCase();return rowObjs_(STUDENTS_SHEET).find(r=>String(r.obj.username||"").trim().toLowerCase()===key);}
+function requireActiveStudent_(u){const s=findStudent_(u);if(!s)throw new Error("Student not found");if(!active_(s.obj.active))throw new Error("Student is archived or inactive");return s.obj;}
+function explicitAssignedClasses_(u){return rowObjs_(STUDENT_CLASSES_SHEET).filter(r=>String(r.obj.username).toLowerCase()===String(u).toLowerCase()&&active_(r.obj.active)).map(r=>String(r.obj.classId));}
+function assigned_(u){const rows=explicitAssignedClasses_(u);return rows.length?rows:[DEFAULT_CLASS_ID];}
+function requireAssignedClass_(u,cid){requireActiveStudent_(u);const classId=cid||DEFAULT_CLASS_ID;const cls=listClasses_("true").classes.find(c=>String(c.id)===String(classId));if(!cls)throw new Error("Class is inactive or unavailable");const assignedIds=explicitAssignedClasses_(u);const allowed=assignedIds.length?assignedIds.indexOf(String(classId))!==-1:String(classId)===DEFAULT_CLASS_ID;if(!allowed)throw new Error("Student is not assigned to this class");return cls;}
+function normalizeWatchPercent_(value){const n=Number(value);if(!n||isNaN(n))return 0.9;return n>1?n/100:n;}
+function validateLogin_(u,p){const s=findStudent_(u);if(!u||!p)return{ok:false,error:"Missing username or password"};if(!s||String(s.obj.password)!==String(p)||!active_(s.obj.active))return{ok:false,error:"Invalid username or password"};return{ok:true,username:s.obj.username};} function adminLogin_(u,p){const hit=rowObjs_(ADMINS_SHEET).find(r=>String(r.obj.username).toLowerCase()===String(u||"").toLowerCase()&&String(r.obj.password)===String(p||""));return hit?{ok:true,username:hit.obj.username}:{ok:false,error:"Invalid admin login"};}
+function listClasses_(only){let rows=rowObjs_(CLASSES_SHEET).map(r=>r.obj).filter(c=>!only||!only.toString()||active_(c.active));rows.sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));return{ok:true,classes:rows};} function listModules_(cid,only){let rows=rowObjs_(MODULES_SHEET).map(r=>r.obj).filter(m=>(!cid||m.classId===cid)&&(!only||!only.toString()||active_(m.active)));rows.sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));return{ok:true,modules:rows};} function listTestQuestions_(cid,only){let rows=rowObjs_(TEST_QUESTIONS_SHEET).map(r=>r.obj).filter(q=>(!cid||q.classId===cid)&&(!only||!only.toString()||active_(q.active)));rows.sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));return{ok:true,questions:rows};}
+function getStatus_(u,cid){cid=cid||DEFAULT_CLASS_ID;const cls=requireAssignedClass_(u,cid);const mods=listModules_(cid,"true").modules;const prog=rowObjs_(PROGRESS_SHEET);const tests=rowObjs_(TEST_RESULTS_SHEET);const legacy=cid===DEFAULT_CLASS_ID?legacyStatus_(u):null;const modules=mods.map(m=>({id:String(m.id),title:m.title,youtubeId:m.youtubeId,requiredWatchPercent:normalizeWatchPercent_(m.requiredWatchPercent||cls.requiredWatchPercent),complete:!!prog.find(r=>r.obj.username===u&&r.obj.classId===cid&&String(r.obj.moduleId)===String(m.id)&&active_(r.obj.complete))||(legacy&&legacy.modules["m"+m.id])}));const tr=tests.reverse().find(r=>r.obj.username===u&&r.obj.classId===cid);return{ok:true,username:u,classId:cid,modules,testComplete:tr?active_(tr.obj.complete):(legacy?legacy.testComplete:false),testScore:tr?tr.obj.score:(legacy?legacy.testScore:""),classInfo:cls};}
+function legacyStatus_(u){const sh=sh_(STATUS_SHEET),h=headers_(sh),rows=rowObjs_(STATUS_SHEET),r=rows.find(x=>String(x.obj.username).toLowerCase()===String(u).toLowerCase());const out={modules:{},testComplete:false,testScore:""};if(!r)return out;for(let i=1;i<=10;i++)out.modules["m"+i]=String(r.obj["m"+i]||"").toLowerCase()==="complete";out.testComplete=String(r.obj.testComplete||"").toLowerCase()==="complete";out.testScore=r.obj.testScore||"";return out;}
+function getStudentDashboard_(u){requireActiveStudent_(u);const classIds=assigned_(u);const classes=listClasses_("true").classes.filter(c=>classIds.indexOf(c.id)!==-1).map(c=>Object.assign({},c,{requiredWatchPercent:normalizeWatchPercent_(c.requiredWatchPercent),status:getStatus_(u,c.id)}));return{ok:true,classes};}
+function listStudents_(){const out=rowObjs_(STUDENTS_SHEET).filter(r=>active_(r.obj.active)).map(r=>Object.assign({},r.obj,{classes:assigned_(r.obj.username)}));return{ok:true,students:out};}
+function addStudent_(d){if(!d.username||!d.password)return{ok:false,error:"Missing username or password"};if(findStudent_(d.username))return{ok:false,error:"Username already exists or is archived"};sh_(STUDENTS_SHEET).appendRow([d.username,d.password,new Date(),d.fullNameOnLicense||"",d.licenseNumber||"",d.dob||"",true,""]);saveAssignments_(d.username,d.classes||[DEFAULT_CLASS_ID]);return{ok:true};}
+function updateStudent_(d){const s=findStudent_(d.username);if(!s)return{ok:false,error:"Student not found"};const h=headers_(sh_(STUDENTS_SHEET));[["password",d.password],["updatedAt",new Date()],["fullNameOnLicense",d.fullNameOnLicense||""],["licenseNumber",d.licenseNumber||""],["dob",d.dob||""],["active",true]].forEach(([k,v])=>sh_(STUDENTS_SHEET).getRange(s.row,h.indexOf(k)+1).setValue(v));saveAssignments_(d.username,d.classes||[DEFAULT_CLASS_ID]);return{ok:true};}
+function saveAssignments_(u,classes){const sh=sh_(STUDENT_CLASSES_SHEET);rowObjs_(STUDENT_CLASSES_SHEET).filter(r=>String(r.obj.username).toLowerCase()===String(u).toLowerCase()).forEach(r=>sh.getRange(r.row,3).setValue(false));(classes||[]).forEach(c=>sh.appendRow([u,c,true,new Date()]));}
+function archiveStudent_(u){const s=findStudent_(u);if(!s)return{ok:false,error:"Student not found"};const h=headers_(sh_(STUDENTS_SHEET));sh_(STUDENTS_SHEET).getRange(s.row,h.indexOf("active")+1).setValue(false);sh_(STUDENTS_SHEET).getRange(s.row,h.indexOf("archivedAt")+1).setValue(new Date());return{ok:true};}
+function logModule_(u,cid,mid){if(!u||!cid||!mid)return{ok:false,error:"Missing fields"};requireAssignedClass_(u,cid);const module=listModules_(cid,"true").modules.find(m=>String(m.id)===String(mid)&&String(m.classId)===String(cid)&&active_(m.active));if(!module)throw new Error("Module is inactive or does not belong to this class");sh_(PROGRESS_SHEET).appendRow([u,cid,mid,true,new Date()]);return getStatus_(u,cid);} function logTest_(u,cid,complete,score){const cls=requireAssignedClass_(u,cid);const status=getStatus_(u,cid);if(!status.modules.length||!status.modules.every(m=>m.complete))throw new Error("Test is locked until all modules for this class are complete");const questions=listTestQuestions_(cid,"true").questions;if(!questions.length)throw new Error("No active test questions are configured for this class");const passed=Number(score)>=Number(cls.passingScore||80)&&!!complete;sh_(TEST_RESULTS_SHEET).appendRow([u,cid,!!complete,score,passed,new Date()]);sendTestEmail_(u,cid,cls.title,score,passed);return getStatus_(u,cid);}
+function saveClass_(d){d.requiredWatchPercent=normalizeWatchPercent_(d.requiredWatchPercent);return upsert_(CLASSES_SHEET,d,["id","title","description","passingScore","requiredWatchPercent","sortOrder","active"]);} function saveModule_(d){d.youtubeId=extractYouTubeId_(d.youtubeId||d.youtubeUrl);d.requiredWatchPercent=normalizeWatchPercent_(d.requiredWatchPercent);return upsert_(MODULES_SHEET,d,["id","classId","title","youtubeId","sortOrder","requiredWatchPercent","active"]);} function saveTestQuestion_(d){return upsert_(TEST_QUESTIONS_SHEET,d,["id","classId","question","optionA","optionB","optionC","optionD","correctIndex","sortOrder","active"]);} function upsert_(sheet,d,fields){if(!d.id)d.id=id_();const sh=sh_(sheet),h=headers_(sh),hit=rowObjs_(sheet).find(r=>r.obj.id===d.id);const vals=fields.map(f=>d[f]!==undefined?d[f]:"").concat([new Date()]);if(hit)vals.forEach((v,i)=>sh.getRange(hit.row,h.indexOf(fields.concat(["updatedAt"])[i])+1).setValue(v));else sh.appendRow(vals);return{ok:true,id:d.id};} function deactivateById_(sheet,id){const sh=sh_(sheet),h=headers_(sh),hit=rowObjs_(sheet).find(r=>r.obj.id===id);if(!hit)return{ok:false,error:"Not found"};sh.getRange(hit.row,h.indexOf("active")+1).setValue(false);return{ok:true};}
+function submitSignupRequest_(d){["fullNameOnLicense","licenseNumber","dob","requestedClassId"].forEach(k=>{if(!String(d[k]||"").trim())throw new Error("Missing required field: "+k);});const cls=listClasses_().classes.find(c=>c.id===d.requestedClassId)||{};sh_(SIGNUP_REQUESTS_SHEET).appendRow([new Date(),d.fullNameOnLicense,d.licenseNumber,d.dob,d.requestedClassId,cls.title||d.requestedClassId,"new"]);if(ADMIN_EMAIL)MailApp.sendEmail(ADMIN_EMAIL,"New training request","Training request\nName: "+d.fullNameOnLicense+"\nLicense: "+d.licenseNumber+"\nDOB: "+d.dob+"\nTraining: "+(cls.title||d.requestedClassId));return{ok:true};}
+function sendTestEmail_(u,cid,title,score,passed){if(!ADMIN_EMAIL)return;const s=findStudent_(u),o=s?s.obj:{};MailApp.sendEmail(ADMIN_EMAIL,"Training test finished","test finished\nscore: "+score+"\npass/fail: "+(passed?"pass":"fail")+"\nclass/training name: "+(title||cid)+"\nusername: "+u+"\nfull name on license: "+(o.fullNameOnLicense||"")+"\nlicense number: "+(o.licenseNumber||""));}
+function migrateExistingDataToClassA_(){return{ok:true,message:"Legacy Status maps to Class A and B at read time."};} function extractYouTubeId_(v){const s=String(v||"").trim(),m=s.match(/(?:youtu\.be\/|[?&]v=|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/);return m?m[1]:s;} function json_(obj){return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);}
