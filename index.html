@@ -235,7 +235,8 @@
     }
 
     .hero-btn,
-    .hero-btn-secondary{
+    .hero-btn-secondary,
+    .request-btn{
       display:inline-flex;
       align-items:center;
       justify-content:center;
@@ -247,7 +248,8 @@
       transition:transform .08s ease, opacity .15s ease, background .15s ease, border-color .15s ease;
     }
 
-    .hero-btn{
+    .hero-btn,
+    .request-btn{
       background: linear-gradient(135deg, var(--navy-dark), var(--navy));
       color:#fff;
       box-shadow:0 10px 20px rgba(16,38,58,.18);
@@ -262,12 +264,14 @@
     }
 
     .hero-btn:hover,
-    .hero-btn-secondary:hover{
+    .hero-btn-secondary:hover,
+    .request-btn:hover{
       opacity:.97;
     }
 
     .hero-btn:active,
-    .hero-btn-secondary:active{
+    .hero-btn-secondary:active,
+    .request-btn:active{
       transform:translateY(1px);
     }
 
@@ -361,7 +365,8 @@
       flex:0 0 auto;
     }
 
-    .public-note{
+    .public-note,
+    .request-note{
       margin-top:16px;
       padding:14px 15px;
       border-radius:12px;
@@ -380,6 +385,20 @@
 
     .public-note a:hover{
       text-decoration:underline;
+    }
+
+    .request-note h4{
+      margin:0 0 6px;
+      color:var(--navy-dark);
+      font-size:1.05rem;
+    }
+
+    .request-note p{
+      margin:0 0 12px;
+    }
+
+    .request-btn{
+      width:100%;
     }
 
     .err{
@@ -479,7 +498,8 @@
         flex-direction:column;
       }
       .hero-btn,
-      .hero-btn-secondary{
+      .hero-btn-secondary,
+      .request-btn{
         width:100%;
       }
     }
@@ -560,6 +580,12 @@
           <span id="btnText">Sign In</span>
         </button>
         <div id="msg" class="err"></div>
+
+        <div class="request-note">
+          <h4>Need training access?</h4>
+          <p>Submit a training request if you need to be added to a CDL class or endorsement course.</p>
+          <a class="request-btn" href="class-signup.html">Request Training</a>
+        </div>
 
         <div class="public-note">
           Need pre-trip materials before class?
