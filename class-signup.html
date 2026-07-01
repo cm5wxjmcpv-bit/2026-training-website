@@ -1,1 +1,91 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Request Training</title><script src="config.js" defer></script><script src="frontend-api.js" defer></script><style>:root{--navy:#17324d;--navy-dark:#10263a;--green:#2f8f4e;--bg:#eef2f6;--card:#fff;--muted:#5b6570;--border:#d8e0e8}body{margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:#1f2937}.top{background:linear-gradient(135deg,var(--navy-dark),var(--navy));color:white;border-bottom:4px solid var(--green);padding:22px}.wrap{max-width:760px;margin:0 auto;padding:28px 20px}.card{background:white;border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(16,38,58,.10)}input,select{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;margin:6px 0 16px;font-size:16px}button,a.btn{display:inline-flex;background:var(--green);color:white;border:0;border-radius:12px;padding:12px 16px;font-weight:800;text-decoration:none}.small{color:var(--muted)}.error{color:#b42318}.success{color:green}</style></head><body><div class="top"><div class="wrap" style="padding:0"><h1>Martinsville CDL Program</h1><p>Request Training</p></div></div><main class="wrap"><div class="card"><h2>Training Request</h2><p class="small">Submit your license information and requested training class. Required fields cannot be blank.</p><label>Full name as shown on license<input id="fullNameOnLicense" required></label><label>License number<input id="licenseNumber" required></label><label>Date of birth<input id="dob" type="date" required></label><label>Requested training<select id="requestedClassId" required></select></label><button id="submitBtn">Submit Request</button> <a class="btn" style="background:#17324d" href="resources.html">Back to Resources</a><div id="msg" style="margin-top:14px"></div></div></main><script>document.addEventListener("DOMContentLoaded",()=>{const select=document.getElementById("requestedClassId"),msg=document.getElementById("msg");function render(classes){select.innerHTML="";classes.filter(c=>String(c.active).toLowerCase()!=="false").forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.title;select.appendChild(o);});}async function load(){try{const data=await apiListClasses(true);render((data.classes&&data.classes.length)?data.classes:DEFAULT_CLASSES);}catch(err){console.error(err);render(DEFAULT_CLASSES);}}document.getElementById("submitBtn").addEventListener("click",async()=>{const payload={fullNameOnLicense:document.getElementById("fullNameOnLicense").value.trim(),licenseNumber:document.getElementById("licenseNumber").value.trim(),dob:document.getElementById("dob").value,requestedClassId:select.value};if(!payload.fullNameOnLicense||!payload.licenseNumber||!payload.dob||!payload.requestedClassId){msg.className="error";msg.textContent="Please complete all required fields.";return;}msg.className="";msg.textContent="Submitting…";try{const res=await apiSubmitSignupRequest(payload);msg.className=res.ok?"success":"error";msg.textContent=res.ok?"Request submitted.":(res.error||"Unable to submit request.");}catch(err){console.error(err);msg.className="error";msg.textContent="Unable to submit request.";}});load();});</script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Request Training</title>
+  <script src="config.js" defer></script>
+  <script src="frontend-api.js" defer></script>
+  <style>
+    :root{--navy:#17324d;--navy-dark:#10263a;--green:#2f8f4e;--bg:#eef2f6;--card:#fff;--muted:#5b6570;--border:#d8e0e8}
+    body{margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:#1f2937}
+    .top{background:linear-gradient(135deg,var(--navy-dark),var(--navy));color:white;border-bottom:4px solid var(--green);padding:22px}
+    .wrap{max-width:760px;margin:0 auto;padding:28px 20px}
+    .card{background:white;border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(16,38,58,.10)}
+    input,select{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;margin:6px 0 16px;font-size:16px}
+    button,a.btn{display:inline-flex;background:var(--green);color:white;border:0;border-radius:12px;padding:12px 16px;font-weight:800;text-decoration:none;cursor:pointer}
+    .small{color:var(--muted)}
+    .error{color:#b42318}
+    .success{color:green}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="wrap" style="padding:0">
+      <h1>Martinsville CDL Program</h1>
+      <p>Request Training</p>
+    </div>
+  </div>
+  <main class="wrap">
+    <div class="card">
+      <h2>Training Request</h2>
+      <p class="small">Submit your license information and requested training class. Required fields cannot be blank.</p>
+      <label>Full name as shown on license<input id="fullNameOnLicense" required></label>
+      <label>License number<input id="licenseNumber" required></label>
+      <label>Date of birth<input id="dob" type="date" required></label>
+      <label>Requested training<select id="requestedClassId" required></select></label>
+      <button id="submitBtn">Submit Request</button>
+      <a class="btn" style="background:#17324d" href="index.html">Back to Login</a>
+      <div id="msg" style="margin-top:14px"></div>
+    </div>
+  </main>
+  <script>
+    document.addEventListener("DOMContentLoaded",()=>{
+      const select=document.getElementById("requestedClassId"),msg=document.getElementById("msg");
+      function render(classes){
+        select.innerHTML="";
+        classes.filter(c=>String(c.active).toLowerCase()!=="false").forEach(c=>{
+          const o=document.createElement("option");
+          o.value=c.id;
+          o.textContent=c.title;
+          select.appendChild(o);
+        });
+      }
+      async function load(){
+        try{
+          const data=await apiListClasses(true);
+          render((data.classes&&data.classes.length)?data.classes:DEFAULT_CLASSES);
+        }catch(err){
+          console.error(err);
+          render(DEFAULT_CLASSES);
+        }
+      }
+      document.getElementById("submitBtn").addEventListener("click",async()=>{
+        const payload={
+          fullNameOnLicense:document.getElementById("fullNameOnLicense").value.trim(),
+          licenseNumber:document.getElementById("licenseNumber").value.trim(),
+          dob:document.getElementById("dob").value,
+          requestedClassId:select.value
+        };
+        if(!payload.fullNameOnLicense||!payload.licenseNumber||!payload.dob||!payload.requestedClassId){
+          msg.className="error";
+          msg.textContent="Please complete all required fields.";
+          return;
+        }
+        msg.className="";
+        msg.textContent="Submitting…";
+        try{
+          const res=await apiSubmitSignupRequest(payload);
+          msg.className=res.ok?"success":"error";
+          msg.textContent=res.ok?"Request submitted.":(res.error||"Unable to submit request.");
+        }catch(err){
+          console.error(err);
+          msg.className="error";
+          msg.textContent="Unable to submit request.";
+        }
+      });
+      load();
+    });
+  </script>
+</body>
+</html>
