@@ -29,8 +29,11 @@
   <main class="wrap">
     <div class="card">
       <h2>Training Request</h2>
-      <p class="small">Submit your license information and requested training class. Required fields cannot be blank.</p>
-      <label>Full name as shown on license<input id="fullNameOnLicense" required></label>
+      <p class="small">Create your login and submit the information below. Your account will remain inactive until an administrator approves it.</p>
+      <label>Choose a username<input id="username" autocomplete="username" required></label>
+      <label>Create a password<input id="password" type="password" autocomplete="new-password" required></label>
+      <label>Confirm password<input id="confirmPassword" type="password" autocomplete="new-password" required></label>
+      <label>Full name as shown on license<input id="fullNameOnLicense" autocomplete="name" required></label>
       <label>License number<input id="licenseNumber" required></label>
       <label>Date of birth<input id="dob" type="date" required></label>
       <label>Requested training<select id="requestedClassId" required></select></label>
@@ -61,15 +64,23 @@
         }
       }
       document.getElementById("submitBtn").addEventListener("click",async()=>{
+        const confirmPassword=document.getElementById("confirmPassword").value;
         const payload={
+          username:document.getElementById("username").value.trim(),
+          password:document.getElementById("password").value,
           fullNameOnLicense:document.getElementById("fullNameOnLicense").value.trim(),
           licenseNumber:document.getElementById("licenseNumber").value.trim(),
           dob:document.getElementById("dob").value,
           requestedClassId:select.value
         };
-        if(!payload.fullNameOnLicense||!payload.licenseNumber||!payload.dob||!payload.requestedClassId){
+        if(!payload.username||!payload.password||!confirmPassword||!payload.fullNameOnLicense||!payload.licenseNumber||!payload.dob||!payload.requestedClassId){
           msg.className="error";
           msg.textContent="Please complete all required fields.";
+          return;
+        }
+        if(payload.password!==confirmPassword){
+          msg.className="error";
+          msg.textContent="The passwords do not match.";
           return;
         }
         msg.className="";
@@ -77,7 +88,7 @@
         try{
           const res=await apiSubmitSignupRequest(payload);
           msg.className=res.ok?"success":"error";
-          msg.textContent=res.ok?"Request submitted.":(res.error||"Unable to submit request.");
+          msg.textContent=res.ok?"Request submitted. Your profile is pending approval.":(res.error||"Unable to submit request.");
         }catch(err){
           console.error(err);
           msg.className="error";
