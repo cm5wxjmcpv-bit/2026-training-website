@@ -31,7 +31,7 @@
     </div>
   </div>
   <main class="wrap">
-    <div class="card">
+    <form class="card" id="requestForm">
       <h2>Training Request</h2>
       <p class="small">Create your login and submit the information below. Your account will remain inactive until an administrator approves it.</p>
       <label>Choose a username<input id="username" autocomplete="username" required></label>
@@ -41,16 +41,16 @@
       <label>License number<input id="licenseNumber" required></label>
       <fieldset><legend>Date of birth</legend><div class="date-grid"><label>Year<select id="dobYear" required><option value="">Year</option></select></label><label>Month<select id="dobMonth" required><option value="">Month</option></select></label><label>Day<select id="dobDay" required><option value="">Day</option></select></label></div></fieldset>
       <label>Requested training<select id="requestedClassId" required></select></label>
-      <button id="submitBtn">Submit Request</button>
+      <button id="submitBtn" type="submit">Submit Request</button>
       <a class="btn" style="background:#17324d" href="index.html">Back to Login</a>
       <div id="msg" style="margin-top:14px"></div>
-    </div>
+    </form>
   </main>
   <script>
     document.addEventListener("DOMContentLoaded",()=>{
       const select=document.getElementById("requestedClassId"),msg=document.getElementById("msg");
       function render(classes){
-        select.innerHTML="";
+        select.innerHTML='<option value="">Select training</option>';
         classes.filter(c=>String(c.active).toLowerCase()!=="false").forEach(c=>{
           const o=document.createElement("option");
           o.value=c.id;
@@ -102,14 +102,20 @@
           render(DEFAULT_CLASSES);
         }
       }
-      document.getElementById("submitBtn").addEventListener("click",async()=>{
+      document.getElementById("requestForm").addEventListener("submit",async(event)=>{
+        event.preventDefault();
+        const requestForm=event.currentTarget;
+        if(!requestForm.reportValidity())return;
         const confirmPassword=document.getElementById("confirmPassword").value;
+        const dobYear=document.getElementById("dobYear").value;
+        const dobMonth=document.getElementById("dobMonth").value;
+        const dobDay=document.getElementById("dobDay").value;
         const payload={
           username:document.getElementById("username").value.trim(),
           password:document.getElementById("password").value,
           fullNameOnLicense:document.getElementById("fullNameOnLicense").value.trim(),
           licenseNumber:document.getElementById("licenseNumber").value.trim(),
-          dob:[document.getElementById("dobYear").value,document.getElementById("dobMonth").value,document.getElementById("dobDay").value].join("-"),
+          dob:dobYear&&dobMonth&&dobDay?[dobYear,dobMonth,dobDay].join("-"):"",
           requestedClassId:select.value
         };
         if(!payload.username||!payload.password||!confirmPassword||!payload.fullNameOnLicense||!payload.licenseNumber||!payload.dob||!payload.requestedClassId){
@@ -126,8 +132,9 @@
         msg.textContent="Submitting…";
         try{
           const res=await apiSubmitSignupRequest(payload);
-          msg.className=res.ok?"success":"error";
-          msg.textContent=res.ok?"Request submitted. Your profile is pending approval.":(res.error||"Unable to submit request.");
+          const profileCreated=!!(res&&res.ok&&res.pendingApproval===true);
+          msg.className=profileCreated?"success":"error";
+          msg.textContent=profileCreated?"Request submitted. Your profile is pending approval.":(res&&res.ok?"Your request was logged, but the student profile was not created. Please contact the administrator.":(res.error||"Unable to submit request."));
         }catch(err){
           console.error(err);
           msg.className="error";
