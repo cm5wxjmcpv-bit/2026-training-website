@@ -13,6 +13,10 @@
     .wrap{max-width:760px;margin:0 auto;padding:28px 20px}
     .card{background:white;border:1px solid var(--border);border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(16,38,58,.10)}
     input,select{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;margin:6px 0 16px;font-size:16px}
+    fieldset{border:0;padding:0;margin:0}
+    legend{margin-bottom:6px}
+    .date-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    @media(max-width:560px){.date-grid{grid-template-columns:1fr}}
     button,a.btn{display:inline-flex;background:var(--green);color:white;border:0;border-radius:12px;padding:12px 16px;font-weight:800;text-decoration:none;cursor:pointer}
     .small{color:var(--muted)}
     .error{color:#b42318}
@@ -35,7 +39,7 @@
       <label>Confirm password<input id="confirmPassword" type="password" autocomplete="new-password" required></label>
       <label>Full name as shown on license<input id="fullNameOnLicense" autocomplete="name" required></label>
       <label>License number<input id="licenseNumber" required></label>
-      <label>Date of birth<input id="dob" type="date" required></label>
+      <fieldset><legend>Date of birth</legend><div class="date-grid"><label>Year<select id="dobYear" required><option value="">Year</option></select></label><label>Month<select id="dobMonth" required><option value="">Month</option></select></label><label>Day<select id="dobDay" required><option value="">Day</option></select></label></div></fieldset>
       <label>Requested training<select id="requestedClassId" required></select></label>
       <button id="submitBtn">Submit Request</button>
       <a class="btn" style="background:#17324d" href="index.html">Back to Login</a>
@@ -50,9 +54,44 @@
         classes.filter(c=>String(c.active).toLowerCase()!=="false").forEach(c=>{
           const o=document.createElement("option");
           o.value=c.id;
-          o.textContent=c.title;
+          o.textContent=String(c.id)===String(DEFAULT_CLASS_ID)?"Initial Class B or A":c.title;
           select.appendChild(o);
         });
+      }
+      function populateDays(){
+        const previous=document.getElementById("dobDay").value;
+        const year=Number(document.getElementById("dobYear").value)||2000;
+        const month=Number(document.getElementById("dobMonth").value);
+        const days=month?new Date(year,month,0).getDate():31;
+        const day=document.getElementById("dobDay");
+        day.innerHTML='<option value="">Day</option>';
+        for(let d=1;d<=days;d++){
+          const option=document.createElement("option");
+          option.value=String(d).padStart(2,"0");
+          option.textContent=d;
+          day.appendChild(option);
+        }
+        if(Number(previous)<=days)day.value=previous;
+      }
+      function populateDateOptions(){
+        const year=document.getElementById("dobYear");
+        const month=document.getElementById("dobMonth");
+        const currentYear=new Date().getFullYear();
+        for(let y=currentYear;y>=1900;y--){
+          const option=document.createElement("option");
+          option.value=String(y);
+          option.textContent=y;
+          year.appendChild(option);
+        }
+        ["January","February","March","April","May","June","July","August","September","October","November","December"].forEach((name,index)=>{
+          const option=document.createElement("option");
+          option.value=String(index+1).padStart(2,"0");
+          option.textContent=name;
+          month.appendChild(option);
+        });
+        year.addEventListener("change",populateDays);
+        month.addEventListener("change",populateDays);
+        populateDays();
       }
       async function load(){
         try{
@@ -70,7 +109,7 @@
           password:document.getElementById("password").value,
           fullNameOnLicense:document.getElementById("fullNameOnLicense").value.trim(),
           licenseNumber:document.getElementById("licenseNumber").value.trim(),
-          dob:document.getElementById("dob").value,
+          dob:[document.getElementById("dobYear").value,document.getElementById("dobMonth").value,document.getElementById("dobDay").value].join("-"),
           requestedClassId:select.value
         };
         if(!payload.username||!payload.password||!confirmPassword||!payload.fullNameOnLicense||!payload.licenseNumber||!payload.dob||!payload.requestedClassId){
@@ -95,6 +134,7 @@
           msg.textContent="Unable to submit request.";
         }
       });
+      populateDateOptions();
       load();
     });
   </script>
