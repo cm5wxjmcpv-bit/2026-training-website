@@ -12,7 +12,7 @@ const TEST_RESULTS_SHEET = "TestResults";
 const SIGNUP_REQUESTS_SHEET = "SignupRequests";
 
 const DEFAULT_CLASS_ID = "class-a-b";
-const ADMIN_EMAIL = "";
+const ADMIN_EMAIL = "micah_lackey@yahoo.com";
 // Set this to the admin email address before deploying Apps Script to enable signup and test-completion notifications.
 
 const DEFAULT_CLASSES = [
@@ -61,7 +61,6 @@ const DEFAULT_TEST_QUESTIONS = [
 
 function doGet(e) {
   try {
-    setupSheets_();
     const p = e.parameter || {};
     const action = String(p.action || "").toLowerCase();
     const actions = {
@@ -84,7 +83,6 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    setupSheets_();
     const data = JSON.parse((e.postData && e.postData.contents) || "{}");
     const action = String(data.action || "").toLowerCase();
     const actions = {
@@ -92,6 +90,7 @@ function doPost(e) {
       updatestudent: function() { return updateStudent_(data); },
       deletestudent: function() { return archiveStudent_(data.username); },
       archivestudent: function() { return archiveStudent_(data.username); },
+      approvestudent: function() { return approveStudent_(data.username); },
       logmodule: function() { return logModule_(data.username, data.classId, data.moduleId); },
       logtest: function() { return logTest_(data.username, data.classId, data.complete, data.score); },
       saveclass: function() { return saveClass_(data); },
@@ -173,12 +172,42 @@ function getStatus_(username, classId) {
 
 function legacyStatus_(username) { const row = rowObjs_(STATUS_SHEET).find(function(item) { return String(item.obj.username || "").trim().toLowerCase() === String(username || "").trim().toLowerCase(); }); const out = { modules: {}, testComplete: false, testScore: "" }; for (let i = 1; i <= 10; i++) out.modules["m" + i] = false; if (!row) return out; for (let m = 1; m <= 10; m++) out.modules["m" + m] = String(row.obj["m" + m] || "").toLowerCase() === "complete"; out.testComplete = String(row.obj.testComplete || "").toLowerCase() === "complete"; out.testScore = row.obj.testScore || ""; return out; }
 function getStudentDashboard_(username) { requireActiveStudent_(username); const assigned = assignedClassIds_(username); const activeClasses = listClasses_(true).classes.filter(function(cls) { return assigned.indexOf(String(cls.id)) !== -1; }); const classes = activeClasses.map(function(cls) { cls.status = getStatus_(username, cls.id); return cls; }); return { ok: true, username: username, classes: classes }; }
-function listStudents_() { const students = rowObjs_(STUDENTS_SHEET).filter(function(row) { return active_(row.obj.active); }).map(function(row) { const obj = row.obj; obj.classes = assignedClassIds_(obj.username); return obj; }); return { ok: true, students: students }; }
+function listStudents_() {
+  const assignmentRows = rowObjs_(STUDENT_CLASSES_SHEET);
+  const profiles = rowObjs_(STUDENTS_SHEET).map(function(row) {
+    const obj = row.obj;
+    const key = String(obj.username || "").trim().toLowerCase();
+    const rows = assignmentRows.filter(function(assignment) {
+      return String(assignment.obj.username || "").trim().toLowerCase() === key;
+    });
+    obj.classes = rows.length === 0
+      ? [DEFAULT_CLASS_ID]
+      : rows.filter(function(assignment) { return active_(assignment.obj.active); }).map(function(assignment) { return String(assignment.obj.classId); });
+    return obj;
+  });
+  const students = profiles.filter(function(student) { return active_(student.active); });
+  const pendingStudents = profiles.filter(function(student) {
+    return !active_(student.active) && !String(student.archivedAt || "").trim();
+  });
+  return { ok: true, students: students, pendingStudents: pendingStudents };
+}
 function setCell_(sheet, row, headers, name, value) { const index = headers.indexOf(name); if (index === -1) throw new Error("Missing header: " + name); sheet.getRange(row, index + 1).setValue(value); }
 
 function addStudent_(data) { if (!data.username || !data.password) return { ok: false, error: "Missing username or password" }; if (findStudent_(data.username)) return { ok: false, error: "Username already exists or is archived" }; sh_(STUDENTS_SHEET).appendRow([data.username, data.password, new Date(), data.fullNameOnLicense || "", data.licenseNumber || "", data.dob || "", true, ""]); saveAssignments_(data.username, data.classes || [DEFAULT_CLASS_ID]); ensureStatusRow_(data.username); return { ok: true }; }
 function updateStudent_(data) { const student = findStudent_(data.username); if (!student) return { ok: false, error: "Student not found" }; if (!data.password) return { ok: false, error: "Missing password" }; const sheet = sh_(STUDENTS_SHEET); const headers = headers_(sheet); setCell_(sheet, student.row, headers, "password", data.password); setCell_(sheet, student.row, headers, "updatedAt", new Date()); setCell_(sheet, student.row, headers, "fullNameOnLicense", data.fullNameOnLicense || ""); setCell_(sheet, student.row, headers, "licenseNumber", data.licenseNumber || ""); setCell_(sheet, student.row, headers, "dob", data.dob || ""); setCell_(sheet, student.row, headers, "active", true); setCell_(sheet, student.row, headers, "archivedAt", ""); saveAssignments_(data.username, data.classes || [DEFAULT_CLASS_ID]); ensureStatusRow_(data.username); return { ok: true }; }
 function saveAssignments_(username, classIds) { const sheet = sh_(STUDENT_CLASSES_SHEET); const rows = rowObjs_(STUDENT_CLASSES_SHEET); const key = String(username || "").trim().toLowerCase(); rows.forEach(function(row) { if (String(row.obj.username || "").trim().toLowerCase() === key) { sheet.getRange(row.row, 3).setValue(false); sheet.getRange(row.row, 4).setValue(new Date()); } }); const unique = {}; (classIds || []).forEach(function(classId) { if (classId) unique[String(classId)] = true; }); Object.keys(unique).forEach(function(classId) { classById_(classId, false); sheet.appendRow([username, classId, true, new Date()]); }); }
+function approveStudent_(username) {
+  const student = findStudent_(username);
+  if (!student) return { ok: false, error: "Student not found" };
+  if (String(student.obj.archivedAt || "").trim()) return { ok: false, error: "Archived profiles cannot be approved" };
+  const sheet = sh_(STUDENTS_SHEET);
+  const headers = headers_(sheet);
+  setCell_(sheet, student.row, headers, "active", true);
+  setCell_(sheet, student.row, headers, "updatedAt", new Date());
+  setCell_(sheet, student.row, headers, "archivedAt", "");
+  ensureStatusRow_(student.obj.username);
+  return { ok: true };
+}
 function archiveStudent_(username) { const student = findStudent_(username); if (!student) return { ok: false, error: "Student not found" }; const sheet = sh_(STUDENTS_SHEET); const headers = headers_(sheet); setCell_(sheet, student.row, headers, "active", false); setCell_(sheet, student.row, headers, "archivedAt", new Date()); saveAssignments_(username, []); return { ok: true }; }
 
 function logModule_(username, classId, moduleId) { const cid = classId || DEFAULT_CLASS_ID; requireAssignedClass_(username, cid); const module = activeModuleForClass_(cid, moduleId); upsertProgress_(username, cid, module.id); if (cid === DEFAULT_CLASS_ID) logLegacyModule_(username, module.id); return getStatus_(username, cid); }
@@ -197,7 +226,27 @@ function saveTestQuestion_(data) { const classId = data.classId || DEFAULT_CLASS
 function upsert_(sheetName, data, fields) { const sheet = sh_(sheetName); const headers = headers_(sheet); const hit = rowObjs_(sheetName).find(function(row) { return String(row.obj.id) === String(data.id); }); if (hit) { fields.forEach(function(field) { setCell_(sheet, hit.row, headers, field, data[field]); }); setCell_(sheet, hit.row, headers, "updatedAt", new Date()); } else { const row = fields.map(function(field) { return data[field]; }); row.push(new Date()); sheet.appendRow(row); } return { ok: true, id: data.id }; }
 function deactivateById_(sheetName, id) { if (!id) return { ok: false, error: "Missing id" }; const sheet = sh_(sheetName); const headers = headers_(sheet); const hit = rowObjs_(sheetName).find(function(row) { return String(row.obj.id) === String(id); }); if (!hit) return { ok: false, error: "Not found" }; setCell_(sheet, hit.row, headers, "active", false); if (headers.indexOf("updatedAt") !== -1) setCell_(sheet, hit.row, headers, "updatedAt", new Date()); return { ok: true }; }
 
-function submitSignupRequest_(data) { ["fullNameOnLicense", "licenseNumber", "dob", "requestedClassId"].forEach(function(key) { if (!String(data[key] || "").trim()) throw new Error("Missing required field: " + key); }); const cls = classById_(data.requestedClassId, false); sh_(SIGNUP_REQUESTS_SHEET).appendRow([new Date(), data.fullNameOnLicense, data.licenseNumber, data.dob, data.requestedClassId, cls.title || data.requestedClassTitle || data.requestedClassId, "new"]); if (ADMIN_EMAIL) MailApp.sendEmail(ADMIN_EMAIL, "New training request", "Training request\nName: " + data.fullNameOnLicense + "\nLicense: " + data.licenseNumber + "\nDOB: " + data.dob + "\nTraining: " + (cls.title || data.requestedClassId)); return { ok: true }; }
+function submitSignupRequest_(data) {
+  ["username", "password", "fullNameOnLicense", "licenseNumber", "dob", "requestedClassId"].forEach(function(key) {
+    if (!String(data[key] || "").trim()) throw new Error("Missing required field: " + key);
+  });
+  const username = String(data.username).trim();
+  const cls = classById_(data.requestedClassId, true);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (findStudent_(username)) throw new Error("That username is already in use. Please choose another.");
+    sh_(STUDENTS_SHEET).appendRow([username, data.password, new Date(), data.fullNameOnLicense, data.licenseNumber, data.dob, false, ""]);
+    saveAssignments_(username, [data.requestedClassId]);
+    sh_(SIGNUP_REQUESTS_SHEET).appendRow([new Date(), data.fullNameOnLicense, data.licenseNumber, data.dob, data.requestedClassId, cls.title || data.requestedClassId, "new"]);
+  } finally {
+    lock.releaseLock();
+  }
+  if (ADMIN_EMAIL) {
+    MailApp.sendEmail(ADMIN_EMAIL, "New training request", "Training request\nUsername: " + username + "\nName: " + data.fullNameOnLicense + "\nLicense: " + data.licenseNumber + "\nDOB: " + data.dob + "\nTraining: " + (cls.title || data.requestedClassId) + "\nStatus: Pending approval");
+  }
+  return { ok: true, username: username, pendingApproval: true };
+}
 function sendTestEmail_(username, classId, title, score, passed) { if (!ADMIN_EMAIL) return; const student = findStudent_(username); const info = student ? student.obj : {}; MailApp.sendEmail(ADMIN_EMAIL, "Training test finished", "test finished\nscore: " + score + "\npass/fail: " + (passed ? "pass" : "fail") + "\nclass/training name: " + (title || classId) + "\nusername: " + username + "\nfull name on license: " + (info.fullNameOnLicense || "") + "\nlicense number: " + (info.licenseNumber || "")); }
 function migrateExistingDataToClassA_() { return { ok: true, message: "Legacy Status maps to Class A and B at read time." }; }
 function extractYouTubeId_(value) { const text = String(value || "").trim(); if (!text) return ""; const direct = text.match(/^[a-zA-Z0-9_-]{11}$/); if (direct) return text; const match = text.match(/(?:youtu\.be\/|[?&]v=|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/); return match ? match[1] : text; }
