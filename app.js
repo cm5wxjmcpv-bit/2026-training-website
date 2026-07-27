@@ -13,6 +13,7 @@ const SIGNUP_REQUESTS_SHEET = "SignupRequests";
 
 const DEFAULT_CLASS_ID = "class-a-b";
 const ADMIN_EMAIL = "micah_lackey@yahoo.com";
+const BACKEND_VERSION = "2026-07-27-pending-approval-v2";
 // Set this to the admin email address before deploying Apps Script to enable signup and test-completion notifications.
 
 const DEFAULT_CLASSES = [
@@ -67,6 +68,7 @@ function doGet(e) {
       validatelogin: function() { return validateLogin_(p.username, p.password); },
       adminlogin: function() { return adminLogin_(p.username, p.password); },
       liststudents: function() { return listStudents_(); },
+      getversion: function() { return { ok: true, version: BACKEND_VERSION }; },
       getstatus: function() { return getStatus_(p.username, p.classId); },
       getstudentdashboard: function() { return getStudentDashboard_(p.username); },
       listclasses: function() { return listClasses_(p.activeOnly); },
@@ -189,7 +191,7 @@ function listStudents_() {
   const pendingStudents = profiles.filter(function(student) {
     return !active_(student.active) && !String(student.archivedAt || "").trim();
   });
-  return { ok: true, students: students, pendingStudents: pendingStudents };
+  return { ok: true, students: students, pendingStudents: pendingStudents, backendVersion: BACKEND_VERSION };
 }
 function setCell_(sheet, row, headers, name, value) { const index = headers.indexOf(name); if (index === -1) throw new Error("Missing header: " + name); sheet.getRange(row, index + 1).setValue(value); }
 
@@ -245,7 +247,7 @@ function submitSignupRequest_(data) {
   if (ADMIN_EMAIL) {
     MailApp.sendEmail(ADMIN_EMAIL, "New training request", "Training request\nUsername: " + username + "\nName: " + data.fullNameOnLicense + "\nLicense: " + data.licenseNumber + "\nDOB: " + data.dob + "\nTraining: " + (cls.title || data.requestedClassId) + "\nStatus: Pending approval");
   }
-  return { ok: true, username: username, pendingApproval: true };
+  return { ok: true, username: username, pendingApproval: true, backendVersion: BACKEND_VERSION };
 }
 function sendTestEmail_(username, classId, title, score, passed) { if (!ADMIN_EMAIL) return; const student = findStudent_(username); const info = student ? student.obj : {}; MailApp.sendEmail(ADMIN_EMAIL, "Training test finished", "test finished\nscore: " + score + "\npass/fail: " + (passed ? "pass" : "fail") + "\nclass/training name: " + (title || classId) + "\nusername: " + username + "\nfull name on license: " + (info.fullNameOnLicense || "") + "\nlicense number: " + (info.licenseNumber || "")); }
 function migrateExistingDataToClassA_() { return { ok: true, message: "Legacy Status maps to Class A and B at read time." }; }
