@@ -13,7 +13,7 @@ const SIGNUP_REQUESTS_SHEET = "SignupRequests";
 
 const DEFAULT_CLASS_ID = "class-a-b";
 const ADMIN_EMAIL = "micah_lackey@yahoo.com";
-const BACKEND_VERSION = "2026-07-27-pending-approval-v2";
+const BACKEND_VERSION = "2026-07-30-request-contact-v1";
 // Set this to the admin email address before deploying Apps Script to enable signup and test-completion notifications.
 
 const DEFAULT_CLASSES = [
@@ -124,7 +124,7 @@ function normalizeWatchPercent_(value) { const n = Number(value); if (!n || isNa
 function id_() { return Utilities.getUuid(); }
 
 function setupSheets_() {
-  ensureHeaders_(STUDENTS_SHEET, ["username", "password", "updatedAt", "fullNameOnLicense", "licenseNumber", "dob", "active", "archivedAt"]);
+  ensureHeaders_(STUDENTS_SHEET, ["username", "password", "updatedAt", "fullNameOnLicense", "licenseNumber", "dob", "active", "archivedAt", "preferredContact"]);
   ensureHeaders_(ADMINS_SHEET, ["username", "password"]);
   ensureHeaders_(STATUS_SHEET, ["username", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "testComplete", "testScore", "updatedAt"]);
   ensureHeaders_(CLASSES_SHEET, ["id", "title", "description", "passingScore", "requiredWatchPercent", "sortOrder", "active", "updatedAt"]);
@@ -133,11 +133,16 @@ function setupSheets_() {
   ensureHeaders_(STUDENT_CLASSES_SHEET, ["username", "classId", "active", "updatedAt"]);
   ensureHeaders_(PROGRESS_SHEET, ["username", "classId", "moduleId", "complete", "updatedAt"]);
   ensureHeaders_(TEST_RESULTS_SHEET, ["username", "classId", "complete", "score", "passed", "updatedAt"]);
-  ensureHeaders_(SIGNUP_REQUESTS_SHEET, ["createdAt", "fullNameOnLicense", "licenseNumber", "dob", "requestedClassId", "requestedClassTitle", "status"]);
+  ensureHeaders_(SIGNUP_REQUESTS_SHEET, ["createdAt", "fullNameOnLicense", "licenseNumber", "dob", "requestedClassId", "requestedClassTitle", "status", "preferredContact"]);
   seed_(CLASSES_SHEET, DEFAULT_CLASSES);
   seed_(MODULES_SHEET, DEFAULT_MODULES);
   seed_(TEST_QUESTIONS_SHEET, DEFAULT_TEST_QUESTIONS);
   return { ok: true };
+}
+
+function ensureContactColumns_() {
+  ensureHeaders_(STUDENTS_SHEET, ["username", "password", "updatedAt", "fullNameOnLicense", "licenseNumber", "dob", "active", "archivedAt", "preferredContact"]);
+  ensureHeaders_(SIGNUP_REQUESTS_SHEET, ["createdAt", "fullNameOnLicense", "licenseNumber", "dob", "requestedClassId", "requestedClassTitle", "status", "preferredContact"]);
 }
 
 function seed_(sheetName, rows) { const sheet = sh_(sheetName); const existing = {}; rowObjs_(sheetName).forEach(function(row) { existing[String(row.obj.id)] = true; }); rows.forEach(function(row) { if (!existing[String(row[0])]) sheet.appendRow(row.concat([new Date()])); }); }
@@ -175,6 +180,7 @@ function getStatus_(username, classId) {
 function legacyStatus_(username) { const row = rowObjs_(STATUS_SHEET).find(function(item) { return String(item.obj.username || "").trim().toLowerCase() === String(username || "").trim().toLowerCase(); }); const out = { modules: {}, testComplete: false, testScore: "" }; for (let i = 1; i <= 10; i++) out.modules["m" + i] = false; if (!row) return out; for (let m = 1; m <= 10; m++) out.modules["m" + m] = String(row.obj["m" + m] || "").toLowerCase() === "complete"; out.testComplete = String(row.obj.testComplete || "").toLowerCase() === "complete"; out.testScore = row.obj.testScore || ""; return out; }
 function getStudentDashboard_(username) { requireActiveStudent_(username); const assigned = assignedClassIds_(username); const activeClasses = listClasses_(true).classes.filter(function(cls) { return assigned.indexOf(String(cls.id)) !== -1; }); const classes = activeClasses.map(function(cls) { cls.status = getStatus_(username, cls.id); return cls; }); return { ok: true, username: username, classes: classes }; }
 function listStudents_() {
+  ensureContactColumns_();
   const assignmentRows = rowObjs_(STUDENT_CLASSES_SHEET);
   const profiles = rowObjs_(STUDENTS_SHEET).map(function(row) {
     const obj = row.obj;
@@ -195,8 +201,8 @@ function listStudents_() {
 }
 function setCell_(sheet, row, headers, name, value) { const index = headers.indexOf(name); if (index === -1) throw new Error("Missing header: " + name); sheet.getRange(row, index + 1).setValue(value); }
 
-function addStudent_(data) { if (!data.username || !data.password) return { ok: false, error: "Missing username or password" }; if (findStudent_(data.username)) return { ok: false, error: "Username already exists or is archived" }; sh_(STUDENTS_SHEET).appendRow([data.username, data.password, new Date(), data.fullNameOnLicense || "", data.licenseNumber || "", data.dob || "", true, ""]); saveAssignments_(data.username, data.classes || [DEFAULT_CLASS_ID]); ensureStatusRow_(data.username); return { ok: true }; }
-function updateStudent_(data) { const student = findStudent_(data.username); if (!student) return { ok: false, error: "Student not found" }; if (!data.password) return { ok: false, error: "Missing password" }; const sheet = sh_(STUDENTS_SHEET); const headers = headers_(sheet); setCell_(sheet, student.row, headers, "password", data.password); setCell_(sheet, student.row, headers, "updatedAt", new Date()); setCell_(sheet, student.row, headers, "fullNameOnLicense", data.fullNameOnLicense || ""); setCell_(sheet, student.row, headers, "licenseNumber", data.licenseNumber || ""); setCell_(sheet, student.row, headers, "dob", data.dob || ""); setCell_(sheet, student.row, headers, "active", true); setCell_(sheet, student.row, headers, "archivedAt", ""); saveAssignments_(data.username, data.classes || [DEFAULT_CLASS_ID]); ensureStatusRow_(data.username); return { ok: true }; }
+function addStudent_(data) { ensureContactColumns_(); if (!data.username || !data.password) return { ok: false, error: "Missing username or password" }; if (findStudent_(data.username)) return { ok: false, error: "Username already exists or is archived" }; sh_(STUDENTS_SHEET).appendRow([data.username, data.password, new Date(), data.fullNameOnLicense || "", data.licenseNumber || "", data.dob || "", true, "", data.preferredContact || ""]); saveAssignments_(data.username, data.classes || [DEFAULT_CLASS_ID]); ensureStatusRow_(data.username); return { ok: true }; }
+function updateStudent_(data) { ensureContactColumns_(); const student = findStudent_(data.username); if (!student) return { ok: false, error: "Student not found" }; if (!data.password) return { ok: false, error: "Missing password" }; const sheet = sh_(STUDENTS_SHEET); const headers = headers_(sheet); setCell_(sheet, student.row, headers, "password", data.password); setCell_(sheet, student.row, headers, "updatedAt", new Date()); setCell_(sheet, student.row, headers, "fullNameOnLicense", data.fullNameOnLicense || ""); setCell_(sheet, student.row, headers, "licenseNumber", data.licenseNumber || ""); setCell_(sheet, student.row, headers, "dob", data.dob || ""); setCell_(sheet, student.row, headers, "preferredContact", data.preferredContact || ""); setCell_(sheet, student.row, headers, "active", true); setCell_(sheet, student.row, headers, "archivedAt", ""); saveAssignments_(data.username, data.classes || [DEFAULT_CLASS_ID]); ensureStatusRow_(data.username); return { ok: true }; }
 function saveAssignments_(username, classIds) { const sheet = sh_(STUDENT_CLASSES_SHEET); const rows = rowObjs_(STUDENT_CLASSES_SHEET); const key = String(username || "").trim().toLowerCase(); rows.forEach(function(row) { if (String(row.obj.username || "").trim().toLowerCase() === key) { sheet.getRange(row.row, 3).setValue(false); sheet.getRange(row.row, 4).setValue(new Date()); } }); const unique = {}; (classIds || []).forEach(function(classId) { if (classId) unique[String(classId)] = true; }); Object.keys(unique).forEach(function(classId) { classById_(classId, false); sheet.appendRow([username, classId, true, new Date()]); }); }
 function approveStudent_(username) {
   const student = findStudent_(username);
@@ -229,26 +235,30 @@ function upsert_(sheetName, data, fields) { const sheet = sh_(sheetName); const 
 function deactivateById_(sheetName, id) { if (!id) return { ok: false, error: "Missing id" }; const sheet = sh_(sheetName); const headers = headers_(sheet); const hit = rowObjs_(sheetName).find(function(row) { return String(row.obj.id) === String(id); }); if (!hit) return { ok: false, error: "Not found" }; setCell_(sheet, hit.row, headers, "active", false); if (headers.indexOf("updatedAt") !== -1) setCell_(sheet, hit.row, headers, "updatedAt", new Date()); return { ok: true }; }
 
 function submitSignupRequest_(data) {
-  ["username", "password", "fullNameOnLicense", "licenseNumber", "dob", "requestedClassId"].forEach(function(key) {
+  ["username", "password", "fullNameOnLicense", "licenseNumber", "preferredContact", "dob", "requestedClassId"].forEach(function(key) {
     if (!String(data[key] || "").trim()) throw new Error("Missing required field: " + key);
   });
   const username = String(data.username).trim();
+  const preferredContact = String(data.preferredContact).trim();
+  if (!validPreferredContact_(preferredContact)) throw new Error("Enter a valid email address or cell phone number.");
   const cls = classById_(data.requestedClassId, true);
+  ensureContactColumns_();
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
     if (findStudent_(username)) throw new Error("That username is already in use. Please choose another.");
-    sh_(STUDENTS_SHEET).appendRow([username, data.password, new Date(), data.fullNameOnLicense, data.licenseNumber, data.dob, false, ""]);
+    sh_(STUDENTS_SHEET).appendRow([username, data.password, new Date(), data.fullNameOnLicense, data.licenseNumber, data.dob, false, "", preferredContact]);
     saveAssignments_(username, [data.requestedClassId]);
-    sh_(SIGNUP_REQUESTS_SHEET).appendRow([new Date(), data.fullNameOnLicense, data.licenseNumber, data.dob, data.requestedClassId, cls.title || data.requestedClassId, "new"]);
+    sh_(SIGNUP_REQUESTS_SHEET).appendRow([new Date(), data.fullNameOnLicense, data.licenseNumber, data.dob, data.requestedClassId, cls.title || data.requestedClassId, "new", preferredContact]);
   } finally {
     lock.releaseLock();
   }
   if (ADMIN_EMAIL) {
-    MailApp.sendEmail(ADMIN_EMAIL, "New training request", "Training request\nUsername: " + username + "\nName: " + data.fullNameOnLicense + "\nLicense: " + data.licenseNumber + "\nDOB: " + data.dob + "\nTraining: " + (cls.title || data.requestedClassId) + "\nStatus: Pending approval");
+    MailApp.sendEmail(ADMIN_EMAIL, "New training request", "Training request\nUsername: " + username + "\nName: " + data.fullNameOnLicense + "\nLicense: " + data.licenseNumber + "\nContact: " + preferredContact + "\nDOB: " + data.dob + "\nTraining: " + (cls.title || data.requestedClassId) + "\nStatus: Pending approval");
   }
   return { ok: true, username: username, pendingApproval: true, backendVersion: BACKEND_VERSION };
 }
+function validPreferredContact_(value) { const contact = String(value || "").trim(); const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact); const digits = contact.replace(/\D/g, ""); const phoneOk = /^\+?[\d\s().-]+$/.test(contact) && digits.length >= 10 && digits.length <= 15; return emailOk || phoneOk; }
 function sendTestEmail_(username, classId, title, score, passed) { if (!ADMIN_EMAIL) return; const student = findStudent_(username); const info = student ? student.obj : {}; MailApp.sendEmail(ADMIN_EMAIL, "Training test finished", "test finished\nscore: " + score + "\npass/fail: " + (passed ? "pass" : "fail") + "\nclass/training name: " + (title || classId) + "\nusername: " + username + "\nfull name on license: " + (info.fullNameOnLicense || "") + "\nlicense number: " + (info.licenseNumber || "")); }
 function migrateExistingDataToClassA_() { return { ok: true, message: "Legacy Status maps to Class A and B at read time." }; }
 function extractYouTubeId_(value) { const text = String(value || "").trim(); if (!text) return ""; const direct = text.match(/^[a-zA-Z0-9_-]{11}$/); if (direct) return text; const match = text.match(/(?:youtu\.be\/|[?&]v=|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/); return match ? match[1] : text; }
