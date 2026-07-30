@@ -18,9 +18,15 @@
     .date-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
     @media(max-width:560px){.date-grid{grid-template-columns:1fr}}
     button,a.btn{display:inline-flex;background:var(--green);color:white;border:0;border-radius:12px;padding:12px 16px;font-weight:800;text-decoration:none;cursor:pointer}
+    button:disabled{cursor:wait;opacity:.7}
     .small{color:var(--muted)}
     .error{color:#b42318}
     .success{color:green}
+    .confirmation-modal{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(16,38,58,.55)}
+    .confirmation-modal[hidden]{display:none}
+    .confirmation-card{width:min(100%,520px);background:white;border-radius:18px;padding:26px;box-shadow:0 24px 70px rgba(16,38,58,.28);text-align:center}
+    .confirmation-card h2{margin:0 0 12px;color:var(--navy-dark)}
+    .confirmation-card p{margin:0 0 20px;line-height:1.6}
   </style>
 </head>
 <body>
@@ -39,6 +45,7 @@
       <label>Confirm password<input id="confirmPassword" type="password" autocomplete="new-password" required></label>
       <label>Full name as shown on license<input id="fullNameOnLicense" autocomplete="name" required></label>
       <label>License number<input id="licenseNumber" required></label>
+      <label>Email address or cell phone number <span class="small">(email preferred)</span><input id="preferredContact" type="text" autocomplete="email" placeholder="name@example.com or (276) 555-0123" required></label>
       <fieldset><legend>Date of birth</legend><div class="date-grid"><label>Year<select id="dobYear" required><option value="">Year</option></select></label><label>Month<select id="dobMonth" required><option value="">Month</option></select></label><label>Day<select id="dobDay" required><option value="">Day</option></select></label></div></fieldset>
       <label>Requested training<select id="requestedClassId" required></select></label>
       <button id="submitBtn" type="submit">Submit Request</button>
@@ -46,9 +53,36 @@
       <div id="msg" style="margin-top:14px"></div>
     </form>
   </main>
+  <div id="confirmationModal" class="confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="confirmationTitle" hidden>
+    <div class="confirmation-card">
+      <h2 id="confirmationTitle">Request submitted</h2>
+      <p>Your request has been received. You will be contacted by text or email when your profile has been created and you can start training.</p>
+      <button id="confirmationClose" type="button">OK</button>
+    </div>
+  </div>
   <script>
     document.addEventListener("DOMContentLoaded",()=>{
-      const select=document.getElementById("requestedClassId"),msg=document.getElementById("msg");
+      const select=document.getElementById("requestedClassId");
+      const msg=document.getElementById("msg");
+      const contactInput=document.getElementById("preferredContact");
+      const submitBtn=document.getElementById("submitBtn");
+      const confirmationModal=document.getElementById("confirmationModal");
+      const confirmationClose=document.getElementById("confirmationClose");
+      function validContact(value){
+        const contact=String(value||"").trim();
+        const emailOk=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
+        const digits=contact.replace(/\D/g,"");
+        const phoneOk=/^\+?[\d\s().-]+$/.test(contact)&&digits.length>=10&&digits.length<=15;
+        return emailOk||phoneOk;
+      }
+      function showConfirmation(){
+        confirmationModal.hidden=false;
+        confirmationClose.focus();
+      }
+      function hideConfirmation(){
+        confirmationModal.hidden=true;
+        document.getElementById("username").focus();
+      }
       function render(classes){
         select.innerHTML='<option value="">Select training</option>';
         classes.filter(c=>String(c.active).toLowerCase()!=="false").forEach(c=>{
@@ -110,17 +144,24 @@
         const dobYear=document.getElementById("dobYear").value;
         const dobMonth=document.getElementById("dobMonth").value;
         const dobDay=document.getElementById("dobDay").value;
+        const preferredContact=contactInput.value.trim();
         const payload={
           username:document.getElementById("username").value.trim(),
           password:document.getElementById("password").value,
           fullNameOnLicense:document.getElementById("fullNameOnLicense").value.trim(),
           licenseNumber:document.getElementById("licenseNumber").value.trim(),
+          preferredContact,
           dob:dobYear&&dobMonth&&dobDay?[dobYear,dobMonth,dobDay].join("-"):"",
           requestedClassId:select.value
         };
-        if(!payload.username||!payload.password||!confirmPassword||!payload.fullNameOnLicense||!payload.licenseNumber||!payload.dob||!payload.requestedClassId){
+        if(!payload.username||!payload.password||!confirmPassword||!payload.fullNameOnLicense||!payload.licenseNumber||!payload.preferredContact||!payload.dob||!payload.requestedClassId){
           msg.className="error";
           msg.textContent="Please complete all required fields.";
+          return;
+        }
+        if(!validContact(payload.preferredContact)){
+          contactInput.setCustomValidity("Enter a valid email address or cell phone number.");
+          contactInput.reportValidity();
           return;
         }
         if(payload.password!==confirmPassword){
@@ -128,19 +169,30 @@
           msg.textContent="The passwords do not match.";
           return;
         }
+        submitBtn.disabled=true;
+        submitBtn.textContent="Submitting…";
         msg.className="";
         msg.textContent="Submitting…";
         try{
           const res=await apiSubmitSignupRequest(payload);
           const profileCreated=!!(res&&res.ok&&res.pendingApproval===true);
           msg.className=profileCreated?"success":"error";
-          msg.textContent=profileCreated?"Request submitted. Your profile is pending approval.":(res&&res.ok?"Your request was logged, but the student profile was not created. Please contact the administrator.":(res.error||"Unable to submit request."));
+          msg.textContent=profileCreated?"Request submitted. You will be contacted when your profile is ready.":(res&&res.ok?"Your request was logged, but the student profile was not created. Please contact the administrator.":(res.error||"Unable to submit request."));
+          if(profileCreated){
+            showConfirmation();
+            requestForm.reset();
+          }
         }catch(err){
           console.error(err);
           msg.className="error";
           msg.textContent="Unable to submit request.";
+        }finally{
+          submitBtn.disabled=false;
+          submitBtn.textContent="Submit Request";
         }
       });
+      contactInput.addEventListener("input",()=>contactInput.setCustomValidity(""));
+      confirmationClose.addEventListener("click",hideConfirmation);
       populateDateOptions();
       render(DEFAULT_CLASSES);
       load();
