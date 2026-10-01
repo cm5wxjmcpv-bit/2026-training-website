@@ -333,6 +333,21 @@
       transform:translateY(1px);
     }
 
+    .dmv-checklists .card{
+      min-width:0;
+    }
+
+    .dmv-checklists .btn,
+    .dmv-checklists .btn-secondary{
+      text-align:center;
+      overflow-wrap:anywhere;
+    }
+
+    .dmv-checklists a:focus-visible{
+      outline:3px solid var(--green);
+      outline-offset:4px;
+    }
+
     .info-box{
       margin-top:20px;
       padding:18px;
@@ -463,6 +478,71 @@
           <strong>Built to grow</strong>
           <span>This page is ready for pre-trip videos and added training resources.</span>
         </div>
+      </div>
+    </section>
+
+    <section class="section dmv-checklists" aria-labelledby="dmv-checklists-title">
+      <div class="section-header">
+        <div>
+          <h3 id="dmv-checklists-title">Virginia CDL Vehicle Inspection Checklists</h3>
+          <p>Official Virginia DMV checklists from the Commercial Driver’s License Manual. Checklist set: Version March 2025.</p>
+        </div>
+      </div>
+
+      <div class="grid">
+        <article class="card">
+          <h4>Class A Vehicle Inspection Checklist</h4>
+          <p>Tractor Semi-Trailer, Truck &amp; Trailer, or Bus &amp; Trailer.</p>
+          <div class="meta">
+            <span class="pill">Manual page 11-11</span>
+            <span class="pill">PDF page 149</span>
+          </div>
+          <div class="actions">
+            <a class="btn" href="https://www.dmv.virginia.gov/sites/default/files/forms/dmv60a.pdf#page=149" target="_blank" rel="noopener noreferrer">Open Class A Checklist (PDF)</a>
+          </div>
+        </article>
+
+        <article class="card">
+          <h4>Class B/C Vehicle Inspection Checklist</h4>
+          <p>Straight Truck or Other Straight Vehicle.</p>
+          <div class="meta">
+            <span class="pill">Manual page 11-12</span>
+            <span class="pill">PDF page 150</span>
+          </div>
+          <div class="actions">
+            <a class="btn" href="https://www.dmv.virginia.gov/sites/default/files/forms/dmv60a.pdf#page=150" target="_blank" rel="noopener noreferrer">Open Class B/C Checklist (PDF)</a>
+          </div>
+        </article>
+
+        <article class="card">
+          <h4>Class B/C Passenger or School Bus Checklist</h4>
+          <p>Passenger or School Bus.</p>
+          <div class="meta">
+            <span class="pill">Manual page 11-13</span>
+            <span class="pill">PDF page 151</span>
+          </div>
+          <div class="actions">
+            <a class="btn" href="https://www.dmv.virginia.gov/sites/default/files/forms/dmv60a.pdf#page=151" target="_blank" rel="noopener noreferrer">Open Passenger / School Bus Checklist (PDF)</a>
+          </div>
+        </article>
+
+        <article class="card">
+          <h4>Full Virginia CDL Manual</h4>
+          <p>Open the complete Commercial Driver’s License Manual hosted by Virginia DMV.</p>
+          <div class="meta">
+            <span class="pill">Official Virginia DMV</span>
+            <span class="pill">PDF Format</span>
+          </div>
+          <div class="actions">
+            <a class="btn-secondary" href="https://www.dmv.virginia.gov/sites/default/files/forms/dmv60a.pdf" target="_blank" rel="noopener noreferrer">Open Full Virginia CDL Manual (PDF)</a>
+          </div>
+        </article>
+      </div>
+
+      <div class="info-box">
+        Links open the official DMV PDF in a new tab. If your device opens at the beginning of the manual,
+        go to the PDF page number shown above. Use your PDF viewer’s save or print option to keep a copy
+        or print the checklist page you need.
       </div>
     </section>
 
